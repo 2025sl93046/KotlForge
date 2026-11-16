@@ -1,0 +1,39 @@
+name: Android Integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'diagnostics/**'
+      - 'build-engine/**'
+      - 'cli/**'
+      - 'samples/**'
+      - '*.gradle.kts'
+      - 'gradle/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build KotlForge
+        run: ./gradlew build
+
+      # TODO: Install required Android SDK platform and build-tools for samples/android-app
+      # TODO: Invoke the built KotlForge CLI against samples/android-app with debug variant
+      # TODO: Verify APK exists and is non-empty
+      # TODO: Upload APK and KotlForge JSON report

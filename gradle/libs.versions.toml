@@ -1,0 +1,22 @@
+[versions]
+kotlin            = "2.1.21"
+clikt             = "4.4.0"
+kotlinx-serial    = "1.7.3"
+detekt            = "1.23.7"
+junit5            = "5.11.3"
+mockk             = "1.13.13"
+kotlin-logging    = "7.0.3"
+logback           = "1.5.12"
+
+[libraries]
+clikt                 = { module = "com.github.ajalt.clikt:clikt",                     version.ref = "clikt" }
+kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serial" }
+kotlin-logging        = { module = "io.github.oshai:kotlin-logging-jvm",               version.ref = "kotlin-logging" }
+logback               = { module = "ch.qos.logback:logback-classic",                   version.ref = "logback" }
+junit5                = { module = "org.junit.jupiter:junit-jupiter",                  version.ref = "junit5" }
+mockk                 = { module = "io.mockk:mockk",                                   version.ref = "mockk" }
+
+[plugins]
+kotlin-jvm    = { id = "org.jetbrains.kotlin.jvm",                        version.ref = "kotlin" }
+kotlin-serial = { id = "org.jetbrains.kotlin.plugin.serialization",       version.ref = "kotlin" }
+detekt        = { id = "io.gitlab.arturbosch.detekt",                     version.ref = "detekt" }

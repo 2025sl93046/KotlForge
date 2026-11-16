@@ -1,0 +1,56 @@
+# ── Gradle ────────────────────────────────────────────────────────────────────
+.gradle/
+build/
+**/build/
+gradle-app.setting
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# ── IntelliJ IDEA / Android Studio ───────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+*.xml
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+
+# ── Kotlin ────────────────────────────────────────────────────────────────────
+*.class
+*.kotlin_module
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Android ───────────────────────────────────────────────────────────────────
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ── Secrets / credentials ─────────────────────────────────────────────────────
+*.env
+.env.*
+*.keystore
+*.jks
+google-services.json
+keystore.properties
+
+# ── Logs / temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp
+tmp/

@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run verification
+        run: ./gradlew clean check
+
+      - name: Build distributions
+        run: ./gradlew build
+
+      - name: Store release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlforge-${{ github.ref_name }}
+          path: |
+            **/build/libs/*.jar
+            **/build/distributions/*
+          if-no-files-found: error
