@@ -85,6 +85,61 @@ APK: /path/to/android-app/app/build/outputs/apk/debug/app-debug.apk
 | `--project`, `-p` | `.` (current directory) | Path to the Android project |
 | `--variant`, `-v` | `debug` | Build variant (`debug` or `release`) |
 
+## Architecture
+
+```
++------------------------------------------------------------------+
+|                        User / Terminal                           |
++------------------------------------------------------------------+
+                               |
+                               | runs
+                               v
++------------------------------------------------------------------+
+|                         cli module                               |
+|                                                                  |
+|   kotlforge doctor          kotlforge build                      |
+|   +------------------+      +-----------------------------+      |
+|   | DoctorCommand    |      | BuildCommand                |      |
+|   | prints JDK path  |      | --project  --variant        |      |
+|   | prints SDK path  |      +-------------+---------------+      |
+|   +--------+---------+                    |                      |
+|            |                              |                      |
++------------|------------------------------|--------------------+-+
+             |                              |
+             | uses                         | uses
+             v                              v
++------------------------+    +------------------------------+
+|   diagnostics module   |    |      build-engine module     |
+|                        |    |                              |
+|  ToolchainDetector     |    |  GradleRunner                |
+|  - reads JAVA_HOME     |    |  - receives BuildRequest     |
+|  - reads ANDROID_HOME  |    |  - finds ./gradlew           |
+|  - validates both      |    |  - runs assembleDebug/...    |
+|                        |    |  - locates APK output        |
+|                        |    |  - returns BuildResult       |
++------------------------+    +---------------+--------------+
+             |                                |
+             | both depend on                 |
+             v                                v
++------------------------------------------------------------------+
+|                         core module                              |
+|                                                                  |
+|   BuildRequest                    BuildResult                    |
+|   - projectPath: String           - success: Boolean            |
+|   - variant: String               - apkPath: String?            |
+|                                   - errorMessage: String?       |
++------------------------------------------------------------------+
+                               |
+                               | invokes
+                               v
++------------------------------------------------------------------+
+|               Target Android Project (external)                  |
+|                                                                  |
+|   ./gradlew assembleDebug                                        |
+|   app/build/outputs/apk/debug/app-debug.apk                     |
++------------------------------------------------------------------+
+```
+
 ## Project structure
 
 ```
