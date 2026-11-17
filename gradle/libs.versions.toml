@@ -2,7 +2,7 @@
 kotlin            = "2.4.21"
 clikt             = "4.4.0"
 kotlinx-serial    = "1.7.3"
-detekt            = "1.23.7"
+detekt            = "1.23.8"
 junit5            = "5.11.3"
 mockk             = "1.13.13"
 kotlin-logging    = "7.0.3"
