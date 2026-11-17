@@ -2,10 +2,23 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REQUIRED_JAVA_HOME="/Users/I578425/Library/Java/JavaVirtualMachines/sapmachine-17.0.16/Contents/Home"
+
+resolve_java_home() {
+	if command -v /usr/libexec/java_home >/dev/null 2>&1; then
+		/usr/libexec/java_home -v 17+ 2>/dev/null || true
+	fi
+}
+
+JAVA_HOME_CANDIDATE="$(resolve_java_home)"
+
+if [ -z "$JAVA_HOME_CANDIDATE" ] || [ ! -d "$JAVA_HOME_CANDIDATE" ]; then
+	echo "ERROR: No compatible JDK found (requires JDK 17 or higher)."
+	echo "Install SAP Machine: https://sap.github.io/SapMachine/"
+	exit 1
+fi
 
 # ── Ensure correct JDK is active ─────────────────────────────────────────────
-export JAVA_HOME="$REQUIRED_JAVA_HOME"
+export JAVA_HOME="$JAVA_HOME_CANDIDATE"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 echo "=== KotlForge Build ==="

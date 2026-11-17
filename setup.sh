@@ -2,32 +2,39 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REQUIRED_JAVA_HOME="/Users/I578425/Library/Java/JavaVirtualMachines/sapmachine-17.0.16/Contents/Home"
 ZSHRC="$HOME/.zshrc"
+
+resolve_java_home() {
+  if command -v /usr/libexec/java_home >/dev/null 2>&1; then
+    /usr/libexec/java_home -v 17+ 2>/dev/null || true
+  fi
+}
+
+JAVA_HOME_CANDIDATE="$(resolve_java_home)"
 
 echo "=== KotlForge Setup ==="
 echo ""
 
 # ── 1. Verify JDK 17 exists ──────────────────────────────────────────────────
-if [ ! -d "$REQUIRED_JAVA_HOME" ]; then
-  echo "ERROR: JDK 17 not found at $REQUIRED_JAVA_HOME"
-  echo "Install SAP Machine 17: https://sap.github.io/SapMachine/"
+if [ -z "$JAVA_HOME_CANDIDATE" ] || [ ! -d "$JAVA_HOME_CANDIDATE" ]; then
+  echo "ERROR: No compatible JDK found (requires JDK 17 or higher)."
+  echo "Install SAP Machine: https://sap.github.io/SapMachine/"
   exit 1
 fi
-echo "[1/4] JDK 17 found: $REQUIRED_JAVA_HOME"
+echo "[1/4] Compatible JDK found: $JAVA_HOME_CANDIDATE"
 
 # ── 2. Set JAVA_HOME for this session ────────────────────────────────────────
-export JAVA_HOME="$REQUIRED_JAVA_HOME"
+export JAVA_HOME="$JAVA_HOME_CANDIDATE"
 export PATH="$JAVA_HOME/bin:$PATH"
 echo "[2/4] JAVA_HOME set for this session: $JAVA_HOME"
 
 # ── 3. Persist JAVA_HOME in ~/.zshrc (only if not already set) ───────────────
-EXPORT_LINE="export JAVA_HOME=\"$REQUIRED_JAVA_HOME\""
-if grep -qF "$REQUIRED_JAVA_HOME" "$ZSHRC" 2>/dev/null; then
+EXPORT_LINE="export JAVA_HOME=\"$JAVA_HOME\""
+if grep -qF "$JAVA_HOME" "$ZSHRC" 2>/dev/null; then
   echo "[3/4] JAVA_HOME already in $ZSHRC — skipping"
 else
   echo "" >> "$ZSHRC"
-  echo "# KotlForge: pin JDK 17 (SAP Machine) for Gradle compatibility" >> "$ZSHRC"
+  echo "# KotlForge: pin JDK 17+ for Gradle compatibility" >> "$ZSHRC"
   echo "$EXPORT_LINE" >> "$ZSHRC"
   echo 'export PATH="$JAVA_HOME/bin:$PATH"' >> "$ZSHRC"
   echo "[3/4] JAVA_HOME persisted to $ZSHRC"
