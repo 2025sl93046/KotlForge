@@ -1,49 +1,30 @@
-# KotlForge — Epics & Work Distribution
+# KotlForge — Epics & Backlog
 
-## Team
-
-| Student | Module Ownership | Epic Ownership |
-|---|---|---|
-| Student 1 | `core` | Epic 1 — Core API & Data Models |
-| Student 2 | `diagnostics` | Epic 2 — Toolchain Detection & Diagnostics |
-| Student 3 | `build-engine` | Epic 3 — Build Engine & Gradle Integration |
-| Student 4 | `cli` | Epic 4 — CLI, Reporting & Validation + Epic 5 — Sample App & CI |
-| All | shared | Epic 6 — Documentation & OSS Hygiene + Epic 7 — Team Contracts |
-
----
-
-## Milestones
-
-| Milestone | Goal | Target |
-|---|---|---|
-| `MVP 0.1` | Existing project → debug APK + JSON report via CLI + CI | Week 4 |
-| `0.2` | Project generator, resources, multiple Kotlin files | Week 6 |
-| `0.3` | Test/lint orchestration, AAB support, Kotlin DSL compatibility | Future |
-| `0.4+` | Release signing, multi-module, CI adapters, plugin hooks | Future |
+An epic is a large unit of work with a clear goal and a demonstrable outcome. Each epic maps to one module and one team member as the primary owner. Epics are broken into smaller Backlog Items (BLIs) that can be picked up, reviewed, and merged independently.
 
 ---
 
 ## Epic 7 — Team Contracts ⚠️ Do first
 
-> **Owner:** All students — must be completed in Week 1 before any other epic begins.
-> Nothing else can be built until these contracts are agreed and merged.
+> Must be completed before any other epic begins. Nothing else can be built until these contracts are agreed and merged.
 
-| BLI | Title | Owner | Priority |
-|---|---|---|---|
-| 7.1 | Agree `BuildRequest` / `BuildResult` contracts | Student 1 | Critical |
-| 7.2 | Agree `ToolchainInfo` / `Diagnostic` contracts | Student 2 | Critical |
-| 7.3 | Agree process execution interface | Student 3 | Critical |
-| 7.4 | Agree CLI commands and exit codes | Student 4 | Critical |
-| 7.5 | Agree JSON report schema v1 | Student 4 + Student 1 | Critical |
+These BLIs define the shared interfaces across all modules. See `docs/CONTRACTS.md` for the full agreed text.
+
+| BLI | Title | Priority |
+|---|---|---|
+| 7.1 | Agree `BuildRequest` / `BuildResult` contracts | Critical |
+| 7.2 | Agree `ToolchainInfo` / `Diagnostic` contracts | Critical |
+| 7.3 | Agree process execution interface | Critical |
+| 7.4 | Agree CLI commands and exit codes | Critical |
+| 7.5 | Agree JSON report schema v1 | Critical |
 
 ---
 
 ## Epic 1 — Core API & Data Models
 
-> **Owner:** Student 1 | **Module:** `core` | **Milestone:** MVP 0.1
->
-> Define the stable contracts that every other module depends on.
-> A Kotlin program should be able to invoke KotlForge and receive a typed `BuildResult`.
+**Module:** `core` | **Milestone:** MVP 0.1
+
+Define the stable contracts that every other module depends on. A Kotlin program should be able to invoke KotlForge and receive a typed `BuildResult`.
 
 | BLI | Title | Priority | Estimate | Depends On |
 |---|---|---|---|---|
@@ -66,10 +47,9 @@
 
 ## Epic 2 — Toolchain Detection & Diagnostics
 
-> **Owner:** Student 2 | **Module:** `diagnostics` | **Milestone:** MVP 0.1
->
-> Make environment problems visible before they become confusing build failures.
-> `kotlforge doctor` should report environment state with actionable OK/WARNING/ERROR messages.
+**Module:** `diagnostics` | **Milestone:** MVP 0.1
+
+Make environment problems visible before they become confusing build failures. `kotlforge doctor` should report environment state with actionable OK/WARNING/ERROR messages.
 
 | BLI | Title | Priority | Estimate | Depends On |
 |---|---|---|---|---|
@@ -92,10 +72,9 @@
 
 ## Epic 3 — Build Engine & Gradle Integration
 
-> **Owner:** Student 3 | **Module:** `build-engine` | **Milestone:** MVP 0.1
->
-> Reliably execute the official Android build pipeline for existing projects.
-> An existing project should produce a debug APK through KotlForge.
+**Module:** `build-engine` | **Milestone:** MVP 0.1
+
+Reliably execute the official Android build pipeline for existing projects. An existing project should produce a debug APK through KotlForge.
 
 | BLI | Title | Priority | Estimate | Depends On |
 |---|---|---|---|---|
@@ -120,10 +99,9 @@
 
 ## Epic 4 — CLI, Reporting & Artifact Validation
 
-> **Owner:** Student 4 | **Module:** `cli` | **Milestone:** MVP 0.1
->
-> Make KotlForge easy to invoke for both people and CI automation.
-> The CLI and GitHub Actions should publish build status, report and APK.
+**Module:** `cli` | **Milestone:** MVP 0.1
+
+Make KotlForge easy to invoke for both people and CI automation. The CLI and GitHub Actions should publish build status, report, and APK.
 
 | BLI | Title | Priority | Estimate | Depends On |
 |---|---|---|---|---|
@@ -147,9 +125,9 @@
 
 ## Epic 5 — Sample App & CI Integration
 
-> **Owner:** Student 4 (lead) + all | **Module:** `samples` + `.github` | **Milestone:** MVP 0.1
->
-> Prove KotlForge builds a real Android project end to end in CI.
+**Module:** `samples` + `.github` | **Milestone:** MVP 0.1
+
+Prove KotlForge builds a real Android project end to end in CI.
 
 | BLI | Title | Priority | Estimate | Depends On |
 |---|---|---|---|---|
@@ -165,33 +143,20 @@
 
 ## Epic 6 — Documentation & OSS Hygiene
 
-> **Owner:** All (shared) | **Milestone:** MVP 0.1
+**Module:** shared | **Milestone:** MVP 0.1
 
-| BLI | Title | Owner | Priority | Estimate |
-|---|---|---|---|---|
-| 6.1 | Add `CODE_OF_CONDUCT.md` | Student 1 | Medium | 1 |
-| 6.2 | Add `docs/architecture.md` with module diagram | All | Medium | 2 |
-| 6.3 | Add `docs/compatibility-matrix.md` | Student 2 | Medium | 2 |
-| 6.4 | Add `docs/troubleshooting.md` | Student 4 | Medium | 2 |
-| 6.5 | Update `CODEOWNERS` with real GitHub usernames | Student 1 | High | 1 |
-| 6.6 | End-to-end demo script — doctor → inspect → build → APK → report | All | High | 2 |
+Ensure the project is approachable for new contributors and meets open-source standards.
+
+| BLI | Title | Priority | Estimate |
+|---|---|---|---|
+| 6.1 | Add `CODE_OF_CONDUCT.md` | Medium | 1 |
+| 6.2 | Add `docs/architecture.md` with module diagram | Medium | 2 |
+| 6.3 | Add `docs/compatibility-matrix.md` | Medium | 2 |
+| 6.4 | Add `docs/troubleshooting.md` | Medium | 2 |
+| 6.5 | Update `CODEOWNERS` with real GitHub usernames | High | 1 |
+| 6.6 | End-to-end demo script — doctor → inspect → build → APK → report | High | 2 |
 
 **Total: 10 story points**
-
----
-
-## Summary
-
-| Student | Epics | MVP 0.1 BLIs | Story Points |
-|---|---|---|---|
-| Student 1 | 1, 7 (lead) | 12 | 27 |
-| Student 2 | 2 | 10 | 30 |
-| Student 3 | 3 | 12 | 34 |
-| Student 4 | 4, 5 | 15 | 44 |
-| All shared | 6, 7 | 11 | 10 |
-
-> Student 4 has the highest point count because CLI + reporting + sample app + CI is the widest surface area.
-> If the team finds this unbalanced, move BLIs 5.1 and 5.2 to Student 3 since they directly exercise the build engine.
 
 ---
 
