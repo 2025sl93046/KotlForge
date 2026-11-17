@@ -2,15 +2,16 @@ package dev.kotlforge.engine
 
 import dev.kotlforge.core.ArtifactType
 import dev.kotlforge.core.BuildArtifact
+import dev.kotlforge.core.BuildEngine
 import dev.kotlforge.core.BuildRequest
 import dev.kotlforge.core.BuildResult
 import dev.kotlforge.core.Diagnostic
 import dev.kotlforge.core.DiagnosticLevel
 import java.io.File
 
-class GradleRunner {
+class GradleRunner : BuildEngine {
 
-    fun run(request: BuildRequest): BuildResult {
+    override fun build(request: BuildRequest): BuildResult {
         val projectDir = File(request.projectDir)
         val wrapper = File(projectDir, if (isWindows()) "gradlew.bat" else "gradlew")
         val start = System.currentTimeMillis()
@@ -28,16 +29,21 @@ class GradleRunner {
             )
         }
 
-        val process = ProcessBuilder(wrapper.absolutePath, "assemble${request.variant.replaceFirstChar { it.uppercaseChar() }}")
+        val pb = ProcessBuilder(wrapper.absolutePath, "assemble${request.variant.replaceFirstChar { it.uppercaseChar() }}")
             .directory(projectDir)
             .redirectErrorStream(true)
-            .start()
+
+        pb.environment()["ANDROID_HOME"] = System.getenv("ANDROID_HOME") ?: ""
+        System.getenv("JAVA_HOME")?.let { pb.environment()["JAVA_HOME"] = it }
+
+        val process = pb.start()
 
         val output = process.inputStream.bufferedReader().readText()
         val exitCode = process.waitFor()
         val duration = System.currentTimeMillis() - start
 
         if (exitCode != 0) {
+            println(output)
             return BuildResult(
                 success = false,
                 exitCode = exitCode,
@@ -45,7 +51,7 @@ class GradleRunner {
                 diagnostics = listOf(Diagnostic(
                     level = DiagnosticLevel.ERROR,
                     message = "Build failed with exit code $exitCode",
-                    suggestion = "Check the Gradle output for details"
+                    suggestion = output.lines().lastOrNull { it.isNotBlank() } ?: "Check the Gradle output for details"
                 ))
             )
         }

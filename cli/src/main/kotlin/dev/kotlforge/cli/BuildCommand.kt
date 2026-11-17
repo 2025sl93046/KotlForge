@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import dev.kotlforge.core.BuildRequest
+import dev.kotlforge.core.KotlForge
 import dev.kotlforge.engine.GradleRunner
 
 class BuildCommand : CliktCommand(
@@ -15,13 +16,14 @@ class BuildCommand : CliktCommand(
 
     override fun run() {
         echo("Building $variant variant at: $projectPath")
-        val result = GradleRunner().run(BuildRequest(projectDir = projectPath, variant = variant))
+        val result = KotlForge(GradleRunner()).build(BuildRequest(projectDir = projectPath, variant = variant))
         if (result.success) {
             echo("Build successful")
             result.artifacts.forEach { echo("APK: ${it.path}") }
         } else {
             val error = result.diagnostics.firstOrNull()
-            echo("Build failed: ${error?.message ?: "unknown error"}")
+            echo("Build failed (exit ${result.exitCode}): ${error?.message ?: "unknown error"}")
+            if (error?.suggestion != null) echo("Suggestion: ${error.suggestion}")
         }
     }
 }
