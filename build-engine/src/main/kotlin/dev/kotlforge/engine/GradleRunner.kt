@@ -37,6 +37,7 @@ class GradleRunner(
         writeRawLog(projectDir, result.stdout, result.stderr)
 
         if (result.exitCode != 0) {
+            val logPath = File(projectDir, "kotlforge-build.log").absolutePath
             return BuildResult(
                 success = false,
                 exitCode = result.exitCode,
@@ -45,7 +46,7 @@ class GradleRunner(
                     Diagnostic(
                         level = DiagnosticLevel.ERROR,
                         message = "Build failed with exit code ${result.exitCode}",
-                        suggestion = "Check kotlforge-build.log in the project directory for details"
+                        suggestion = "Check $logPath for details"
                     )
                 )
             )
