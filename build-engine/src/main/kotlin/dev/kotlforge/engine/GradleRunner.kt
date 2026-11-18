@@ -28,9 +28,9 @@ class GradleRunner(
                 )
             )
 
-        val task = "assemble${request.variant.replaceFirstChar { it.uppercaseChar() }}"
+        val tasks = resolveGradleTasks(request)
         val result = processRunner.run(
-            command = listOf(wrapper.absolutePath, task),
+            command = listOf(wrapper.absolutePath) + tasks,
             workingDir = projectDir
         )
 
@@ -60,6 +60,12 @@ class GradleRunner(
             durationMillis = result.durationMillis,
             artifacts = artifacts
         )
+    }
+
+    internal fun resolveGradleTasks(request: BuildRequest): List<String> {
+        if (request.tasks.isNotEmpty()) return request.tasks
+        val variant = request.variant.replaceFirstChar { it.uppercaseChar() }
+        return listOf("assemble$variant")
     }
 
     internal fun locateWrapper(projectDir: File): File? {
