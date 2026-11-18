@@ -61,6 +61,23 @@ class GradleRunnerTest {
     }
 
     @Test
+    fun `findApk locates APK at Gradle standard output path`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile() }
+        val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        val apk = File(apkDir, "app-debug.apk").also { it.createNewFile() }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.run(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+
+        assertTrue(result.success)
+        assertEquals(apk.absolutePath, result.artifacts.first().path)
+    }
+
+    @Test
     fun `writeRawLog writes stdout and stderr to kotlforge-build log`(@TempDir tempDir: File) {
         val runner = GradleRunner()
         runner.writeRawLog(tempDir, "output line", "error line")

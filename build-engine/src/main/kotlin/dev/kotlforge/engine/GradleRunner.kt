@@ -91,8 +91,16 @@ class GradleRunner(
     }
 
     private fun findApk(projectDir: File, variant: String): String? {
+        // Gradle standard output convention: app/build/outputs/apk/<variant>/
+        val conventional = File(projectDir, "app/build/outputs/apk/$variant")
+            .walkTopDown()
+            .filter { it.extension == "apk" }
+            .firstOrNull()
+        if (conventional != null) return conventional.absolutePath
+
+        // Fallback: scan the whole tree (multi-module or custom layouts)
         return projectDir.walkTopDown()
-            .filter { it.name.endsWith(".apk") && it.path.contains(variant, ignoreCase = true) }
+            .filter { it.extension == "apk" && it.path.contains(variant, ignoreCase = true) }
             .firstOrNull()
             ?.absolutePath
     }
