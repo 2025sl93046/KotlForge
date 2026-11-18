@@ -52,15 +52,31 @@ class GradleRunner(
         }
 
         val apk = findApk(projectDir, request.variant)
-        val artifacts = if (apk != null) {
-            listOf(BuildArtifact(type = ArtifactType.APK, path = apk, sizeBytes = File(apk).length()))
-        } else emptyList()
+        val apkFile = apk?.let { File(it) }
+        val apkSize = apkFile?.length() ?: 0L
+
+        if (apkFile == null || apkSize == 0L) {
+            val message = if (apkFile != null) "APK was produced but is empty (0 bytes): $apk"
+                          else "No APK found for variant '${request.variant}'"
+            return BuildResult(
+                success = false,
+                exitCode = result.exitCode,
+                durationMillis = result.durationMillis,
+                diagnostics = listOf(
+                    Diagnostic(
+                        level = DiagnosticLevel.ERROR,
+                        message = message,
+                        suggestion = "Run the build manually and check the Gradle output for errors"
+                    )
+                )
+            )
+        }
 
         return BuildResult(
-            success = apk != null,
+            success = true,
             exitCode = result.exitCode,
             durationMillis = result.durationMillis,
-            artifacts = artifacts
+            artifacts = listOf(BuildArtifact(type = ArtifactType.APK, path = apk, sizeBytes = apkSize))
         )
     }
 
