@@ -34,6 +34,8 @@ class GradleRunner(
             workingDir = projectDir
         )
 
+        writeRawLog(projectDir, result.stdout, result.stderr)
+
         if (result.exitCode != 0) {
             return BuildResult(
                 success = false,
@@ -43,7 +45,7 @@ class GradleRunner(
                     Diagnostic(
                         level = DiagnosticLevel.ERROR,
                         message = "Build failed with exit code ${result.exitCode}",
-                        suggestion = "Check the Gradle output for details"
+                        suggestion = "Check kotlforge-build.log in the project directory for details"
                     )
                 )
             )
@@ -60,6 +62,20 @@ class GradleRunner(
             durationMillis = result.durationMillis,
             artifacts = artifacts
         )
+    }
+
+    internal fun writeRawLog(projectDir: File, stdout: String, stderr: String) {
+        val logFile = File(projectDir, "kotlforge-build.log")
+        logFile.writeText(buildString {
+            if (stdout.isNotBlank()) {
+                appendLine("=== STDOUT ===")
+                appendLine(stdout)
+            }
+            if (stderr.isNotBlank()) {
+                appendLine("=== STDERR ===")
+                appendLine(stderr)
+            }
+        })
     }
 
     internal fun resolveGradleTasks(request: BuildRequest): List<String> {
