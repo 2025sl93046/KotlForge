@@ -5,9 +5,12 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 resolve_java_home() {
 	if command -v /usr/libexec/java_home >/dev/null 2>&1; then
-		/usr/libexec/java_home -v 17+ 2>/dev/null || true
+		/usr/libexec/java_home -v 17 2>/dev/null \
+			|| /usr/libexec/java_home -v 21 2>/dev/null \
+			|| true
 	fi
 }
+# because this code base works only for java version < 25 
 
 JAVA_HOME_CANDIDATE="$(resolve_java_home)"
 
