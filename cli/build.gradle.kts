@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":diagnostics"))
     implementation(project(":build-engine"))
     implementation(project(":deploy"))
+    implementation(project(":watch"))
     implementation(libs.clikt)
     implementation(libs.kotlin.logging)
     runtimeOnly(libs.logback)
