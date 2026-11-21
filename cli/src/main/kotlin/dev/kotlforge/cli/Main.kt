@@ -5,7 +5,7 @@ import com.github.ajalt.clikt.core.subcommands
 
 fun main(args: Array<String>) =
     KotlForge()
-        .subcommands(DoctorCommand(), BuildCommand(), DeployCommand())
+        .subcommands(DoctorCommand(), BuildCommand(), DeployCommand(), WatchCommand())
         .main(args)
 
 class KotlForge : CliktCommand(
