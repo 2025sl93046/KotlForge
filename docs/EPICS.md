@@ -160,6 +160,54 @@ Ensure the project is approachable for new contributors and meets open-source st
 
 ---
 
+## Epic 8 — Wireless Device Deployment
+
+**Module:** `deploy` | **Milestone:** MVP 0.2
+
+Deploy a built APK directly to a physical Android device over WiFi using ADB wireless — no USB cable, no emulator required. The device must be on the same network as the build machine.
+
+| BLI | Title | Priority | Estimate | Depends On |
+|---|---|---|---|---|
+| 8.1 | Discover ADB binary from `ANDROID_HOME` or PATH | Critical | 2 | 3.1 |
+| 8.2 | Detect connected devices over ADB (USB and WiFi) | Critical | 3 | 8.1 |
+| 8.3 | Pair device over WiFi using ADB pairing code (Android 11+) | Critical | 3 | 8.2 |
+| 8.4 | Connect to device wirelessly (`adb connect <ip>:<port>`) | Critical | 2 | 8.3 |
+| 8.5 | Install APK on selected device (`adb install`) | Critical | 2 | 8.4, 3.7 |
+| 8.6 | Add `deploy` CLI command — `--device`, `--apk`, `--variant` | High | 3 | 8.5 |
+| 8.7 | Auto-select device when only one is connected | High | 2 | 8.2 |
+| 8.8 | Handle multiple connected devices with prompt | High | 2 | 8.2 |
+| 8.9 | Persist paired device info for reuse across sessions | Medium | 2 | 8.4 |
+| 8.10 | Unit tests with mocked ADB process runner | High | 3 | 8.5 |
+| 8.11 | Clear error when no devices found or ADB not installed | High | 1 | 8.2 |
+| 8.12 | Document WiFi pairing steps and known device quirks | Medium | 2 | 8.5 |
+
+**Total: 27 story points**
+
+---
+
+## Epic 9 — Hot Reload and Incremental Rebuild
+
+**Module:** `watch` | **Milestone:** MVP 0.2
+
+Watch the Android project source tree for file changes and trigger incremental Gradle builds automatically. Optionally redeploy the updated APK to a connected device after each successful build — giving a fast build-deploy loop without manual reruns.
+
+| BLI | Title | Priority | Estimate | Depends On |
+|---|---|---|---|---|
+| 9.1 | Watch source directories for file changes using Java WatchService | Critical | 3 | 1.6 |
+| 9.2 | Debounce rapid file saves to avoid redundant rebuilds | Critical | 2 | 9.1 |
+| 9.3 | Trigger incremental Gradle build on change (`assemble` with Gradle daemon) | Critical | 3 | 9.1, 3.2 |
+| 9.4 | Report changed files and rebuild duration after each cycle | High | 2 | 9.3 |
+| 9.5 | Auto-redeploy APK to device after successful rebuild | High | 3 | 9.3, 8.5 |
+| 9.6 | Add `watch` CLI command — `--project`, `--variant`, `--deploy` | High | 3 | 9.3 |
+| 9.7 | Graceful shutdown on Ctrl+C — stop Gradle daemon cleanly | High | 2 | 9.3 |
+| 9.8 | Configurable watch paths and ignore patterns in `kotlforge.json` | Medium | 2 | 9.1, 1.8 |
+| 9.9 | Unit tests with mock file system events | High | 3 | 9.1 |
+| 9.10 | Document watch mode limitations (no Kotlin compiler daemon restart) | Medium | 1 | 9.3 |
+
+**Total: 24 story points**
+
+---
+
 ## Sprint plan
 
 | Week | Focus | BLIs |
@@ -181,7 +229,11 @@ Epic 7 (contracts)
     ├──► Epic 1 (core models)
     │         │
     │         ├──► Epic 3 (build engine) ──► Epic 5 (sample + CI)
-    │         │                                      ▲
+    │         │         │                           ▲
+    │         │         └──► Epic 8 (deploy) ───────┘
+    │         │                   │
+    │         │                   └──► Epic 9 (hot reload)
+    │         │
     │         └──► Epic 4 (CLI + reporting) ─────────┘
     │
     └──► Epic 2 (diagnostics) ──► Epic 4 (doctor command)
