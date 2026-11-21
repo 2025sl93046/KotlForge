@@ -68,13 +68,25 @@ class GradleRunner(
             )
         }
 
-        val apk = findApk(projectDir, request.variant)
-        val apkFile = apk?.let { File(it) }
-        val apkSize = apkFile?.length() ?: 0L
+        val artifacts = buildList {
+            findApk(projectDir, request.variant)?.let { path ->
+                val size = File(path).length()
+                if (size > 0L) add(BuildArtifact(type = ArtifactType.APK, path = path, sizeBytes = size))
+            }
+            findAab(projectDir, request.variant)?.let { path ->
+                val size = File(path).length()
+                if (size > 0L) add(BuildArtifact(type = ArtifactType.AAB, path = path, sizeBytes = size))
+            }
+        }
 
-        if (apkFile == null || apkSize == 0L) {
-            val message = if (apkFile != null) "APK was produced but is empty (0 bytes): $apk"
-                          else "No APK found for variant '${request.variant}'"
+        if (artifacts.isEmpty()) {
+            val apkPath = findApk(projectDir, request.variant)
+            val aabPath = findAab(projectDir, request.variant)
+            val message = when {
+                apkPath != null -> "APK was produced but is empty (0 bytes): $apkPath"
+                aabPath != null -> "AAB was produced but is empty (0 bytes): $aabPath"
+                else -> "No APK or AAB found for variant '${request.variant}'"
+            }
             return BuildResult(
                 success = false,
                 exitCode = result.exitCode,
@@ -93,7 +105,7 @@ class GradleRunner(
             success = true,
             exitCode = result.exitCode,
             durationMillis = result.durationMillis,
-            artifacts = listOf(BuildArtifact(type = ArtifactType.APK, path = apk, sizeBytes = apkSize))
+            artifacts = artifacts
         )
     }
 
@@ -134,6 +146,21 @@ class GradleRunner(
         // Fallback: scan the whole tree (multi-module or custom layouts)
         return projectDir.walkTopDown()
             .filter { it.extension == "apk" && it.path.contains(variant, ignoreCase = true) }
+            .firstOrNull()
+            ?.absolutePath
+    }
+
+    internal fun findAab(projectDir: File, variant: String): String? {
+        // Gradle bundle output convention: app/build/outputs/bundle/<variant>/
+        val conventional = File(projectDir, "app/build/outputs/bundle/$variant")
+            .walkTopDown()
+            .filter { it.extension == "aab" }
+            .firstOrNull()
+        if (conventional != null) return conventional.absolutePath
+
+        // Fallback: scan the whole tree
+        return projectDir.walkTopDown()
+            .filter { it.extension == "aab" && it.path.contains(variant, ignoreCase = true) }
             .firstOrNull()
             ?.absolutePath
     }
