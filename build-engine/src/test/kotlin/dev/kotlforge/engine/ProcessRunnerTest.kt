@@ -54,4 +54,41 @@ class ProcessRunnerTest {
         assertEquals(-1, result.exitCode)
         assertTrue(result.stderr.contains("timed out"))
     }
+
+    @Test
+    fun `ProcessRunner timeout stderr message includes the configured timeout value`() {
+        val runner = mockk<ProcessRunner>()
+        val command = listOf("sleep", "9999")
+        val workingDir = File(System.getProperty("java.io.tmpdir"))
+        val timeoutSeconds = 42L
+        val expected = ProcessResult(
+            exitCode = -1,
+            stdout = "",
+            stderr = "Process timed out after $timeoutSeconds seconds",
+            durationMillis = timeoutSeconds * 1000
+        )
+
+        every { runner.run(command, workingDir, timeoutSeconds) } returns expected
+
+        val result = runner.run(command, workingDir, timeoutSeconds)
+
+        assertEquals(-1, result.exitCode)
+        assertTrue(result.stderr.contains("42"))
+    }
+
+    @Test
+    fun `ProcessRunner captures stdout and stderr independently`() {
+        val runner = mockk<ProcessRunner>()
+        val command = listOf("sh", "-c", "echo out; echo err >&2")
+        val workingDir = File(System.getProperty("java.io.tmpdir"))
+        val expected = ProcessResult(exitCode = 0, stdout = "out\n", stderr = "err\n", durationMillis = 5)
+
+        every { runner.run(command, workingDir) } returns expected
+
+        val result = runner.run(command, workingDir)
+
+        assertEquals("out\n", result.stdout)
+        assertEquals("err\n", result.stderr)
+        assertEquals(0, result.exitCode)
+    }
 }
