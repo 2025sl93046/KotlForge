@@ -14,7 +14,7 @@ subprojects {
     apply(plugin = "io.gitlab.arturbosch.detekt")
 
     extensions.configure<DetektExtension> {
-        config.setFrom(rootProject.files(".github/detekt.yml"))
+        config.setFrom(rootProject.files("detekt.yml"))
         buildUponDefaultConfig = true
     }
 
