@@ -18,7 +18,7 @@ class GradleRunnerTest {
     fun `returns failed result when gradlew is missing`() {
         val runner = GradleRunner()
         val request = BuildRequest(projectDir = System.getProperty("java.io.tmpdir") + "/nonexistent-project-12345")
-        val result = runner.run(request)
+        val result = runner.build(request)
         assertFalse(result.success)
         assertEquals(3, result.exitCode)
     }
@@ -39,7 +39,7 @@ class GradleRunnerTest {
     }
 
     @Test
-    fun `run delegates to ProcessRunner with correct command`(@TempDir tempDir: File) {
+    fun `build delegates to ProcessRunner with correct command`(@TempDir tempDir: File) {
         File(tempDir, "gradlew").also { it.createNewFile() }
 
         val mockRunner = mockk<ProcessRunner>()
@@ -48,7 +48,7 @@ class GradleRunnerTest {
         } returns ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 100)
 
         val runner = GradleRunner(processRunner = mockRunner)
-        runner.run(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+        runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
 
         verify {
             mockRunner.run(
