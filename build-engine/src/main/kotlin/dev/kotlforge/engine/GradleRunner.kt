@@ -69,7 +69,7 @@ class GradleRunner(
         }
 
         val artifacts = buildList {
-            findApk(projectDir, request.variant)?.let { path ->
+            findApks(projectDir, request.variant).forEach { path ->
                 val size = File(path).length()
                 if (size > 0L) add(BuildArtifact(type = ArtifactType.APK, path = path, sizeBytes = size))
             }
@@ -80,10 +80,10 @@ class GradleRunner(
         }
 
         if (artifacts.isEmpty()) {
-            val apkPath = findApk(projectDir, request.variant)
+            val apkCandidates = findApks(projectDir, request.variant)
             val aabPath = findAab(projectDir, request.variant)
             val message = when {
-                apkPath != null -> "APK was produced but is empty (0 bytes): $apkPath"
+                apkCandidates.isNotEmpty() -> "APK(s) were produced but are empty (0 bytes): ${apkCandidates.joinToString()}"
                 aabPath != null -> "AAB was produced but is empty (0 bytes): $aabPath"
                 else -> "No APK or AAB found for variant '${request.variant}'"
             }
@@ -135,19 +135,27 @@ class GradleRunner(
         return if (wrapper.exists() && wrapper.isFile) wrapper else null
     }
 
-    private fun findApk(projectDir: File, variant: String): String? {
-        // Gradle standard output convention: app/build/outputs/apk/<variant>/
-        val conventional = File(projectDir, "app/build/outputs/apk/$variant")
-            .walkTopDown()
-            .filter { it.extension == "apk" }
-            .firstOrNull()
-        if (conventional != null) return conventional.absolutePath
+    internal fun findApks(projectDir: File, variant: String): List<String> {
+        val results = mutableListOf<String>()
 
-        // Fallback: scan the whole tree (multi-module or custom layouts)
-        return projectDir.walkTopDown()
-            .filter { it.extension == "apk" && it.path.contains(variant, ignoreCase = true) }
-            .firstOrNull()
-            ?.absolutePath
+        // Scan all direct subdirectories: <module>/build/outputs/apk/<variant>/
+        projectDir.listFiles()
+            ?.filter { it.isDirectory && it.name != "build" }
+            ?.forEach { moduleDir ->
+                File(moduleDir, "build/outputs/apk/$variant")
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "apk" }
+                    .mapTo(results) { it.absolutePath }
+            }
+
+        if (results.isNotEmpty()) return results
+
+        // Fallback: scan the whole tree (custom layouts or deeply nested modules)
+        projectDir.walkTopDown()
+            .filter { it.isFile && it.extension == "apk" && it.path.contains(variant, ignoreCase = true) }
+            .mapTo(results) { it.absolutePath }
+
+        return results
     }
 
     internal fun findAab(projectDir: File, variant: String): String? {

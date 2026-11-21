@@ -255,4 +255,129 @@ class GradleRunnerTest {
         assertFalse(result.success)
         assertTrue(result.diagnostics.first().message.contains("No APK or AAB"))
     }
+
+    @Test
+    fun `findApks discovers APK in app module`(@TempDir tempDir: File) {
+        val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        val apk = File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
+        val runner = GradleRunner()
+        val found = runner.findApks(tempDir, "debug")
+        assertEquals(listOf(apk.absolutePath), found)
+    }
+
+    @Test
+    fun `findApks discovers APKs across multiple app modules`(@TempDir tempDir: File) {
+        val apk1Dir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        val apk1 = File(apk1Dir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
+        val apk2Dir = File(tempDir, "feature-login/build/outputs/apk/debug").also { it.mkdirs() }
+        val apk2 = File(apk2Dir, "feature-login-debug.apk").also { it.writeBytes(ByteArray(2048)) }
+
+        val runner = GradleRunner()
+        val found = runner.findApks(tempDir, "debug")
+
+        assertEquals(2, found.size)
+        assertTrue(found.contains(apk1.absolutePath))
+        assertTrue(found.contains(apk2.absolutePath))
+    }
+
+    @Test
+    fun `findApks returns empty list when no APKs present`(@TempDir tempDir: File) {
+        val runner = GradleRunner()
+        assertTrue(runner.findApks(tempDir, "debug").isEmpty())
+    }
+
+    @Test
+    fun `build returns multiple APK artifacts for multi-module project`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val apk1Dir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apk1Dir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
+        val apk2Dir = File(tempDir, "wear/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apk2Dir, "wear-debug.apk").also { it.writeBytes(ByteArray(2048)) }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+
+        assertTrue(result.success)
+        assertEquals(2, result.artifacts.size)
+        assertTrue(result.artifacts.sumOf { it.sizeBytes } == 3072L)
+    }
+
+    @Test
+    fun `build fails when all discovered APKs are empty zero bytes`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apkDir, "app-debug.apk").also { it.createNewFile() }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+
+        assertFalse(result.success)
+        assertTrue(result.artifacts.isEmpty())
+    }
+
+    @Test
+    fun `build succeeds when project path contains spaces`(@TempDir tempDir: File) {
+        val spacedDir = File(tempDir, "android app with spaces").also { it.mkdirs() }
+        File(spacedDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val apkDir = File(spacedDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = spacedDir.absolutePath))
+
+        assertTrue(result.success)
+        assertEquals(1, result.artifacts.size)
+    }
+
+    @Test
+    fun `locateWrapper finds gradlew inside path that contains spaces`(@TempDir tempDir: File) {
+        val spacedDir = File(tempDir, "my project name with spaces").also { it.mkdirs() }
+        File(spacedDir, "gradlew").also { it.createNewFile() }
+        val runner = GradleRunner()
+        val located = runner.locateWrapper(spacedDir)
+        assertNotNull(located)
+        assertTrue(located!!.absolutePath.contains("my project name with spaces"))
+    }
+
+    @Test
+    fun `build passes gradlew as absolute path so shell does not misinterpret spaces`(@TempDir tempDir: File) {
+        val spacedDir = File(tempDir, "project with spaces").also { it.mkdirs() }
+        File(spacedDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+
+        val capturedCommands = mutableListOf<List<String>>()
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(capture(capturedCommands), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        runner.build(BuildRequest(projectDir = spacedDir.absolutePath))
+
+        val wrapperArg = capturedCommands.first().first()
+        assertTrue(File(wrapperArg).isAbsolute, "Wrapper path must be absolute — got: $wrapperArg")
+    }
+
+    @Test
+    fun `locateWrapper path uses platform native file separator`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile() }
+        val runner = GradleRunner()
+        val located = runner.locateWrapper(tempDir)
+        assertNotNull(located)
+        val path = located!!.absolutePath
+        assertTrue(
+            path.contains(File.separator),
+            "Expected platform separator '${File.separator}' in path: $path"
+        )
+    }
 }
