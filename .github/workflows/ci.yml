@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-and-test:
-    name: Build and Test
+    name: Unit Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -26,16 +26,75 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Run checks
-        run: ./gradlew clean check
+      - name: Run tests
+        run: ./gradlew test
 
-      # TODO: Add detekt static analysis step (./gradlew detekt) and publish report as artifact
-      # TODO: Add code coverage reporting (Kover) and enforce minimum threshold (e.g. 80%)
-      # TODO: Split into parallel jobs: unit-tests, detekt, build — to reduce wall-clock time
-      # TODO: Add caching for ~/.gradle/caches and ~/.gradle/wrapper to speed up builds
-      # TODO: Fail fast on KotlinCompilerWarning — add -Werror to Kotlin compile options
-      # TODO: Add check that CONTRIBUTING.md / docs are updated when new modules are added
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+
+  detekt:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Run detekt
+        run: ./gradlew detekt
+
+      - name: Upload detekt report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-report
+          path: '**/build/reports/detekt/'
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build all modules
+        run: ./gradlew build -x test

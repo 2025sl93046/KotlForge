@@ -1,0 +1,50 @@
+style:
+  MaxLineLength:
+    maxLineLength: 160
+    excludeCommentStatements: true
+  ReturnCount:
+    max: 6
+  MagicNumber:
+    ignoreNumbers:
+      - '-1'
+      - '0'
+      - '1'
+      - '2'
+      - '3'
+      - '5'
+      - '10'
+      - '100'
+      - '500'
+      - '1000'
+      - '1024'
+  WildcardImport:
+    excludeImports:
+      - 'org.junit.jupiter.api.Assertions.*'
+      - 'io.mockk.*'
+  LoopWithTooManyJumpStatements:
+    active: false
+
+complexity:
+  LongMethod:
+    threshold: 100
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+  CyclomaticComplexMethod:
+    threshold: 25
+  LongParameterList:
+    functionThreshold: 8
+  NestedBlockDepth:
+    threshold: 6
+
+naming:
+  active: true
+
+potential-bugs:
+  active: true
+
+exceptions:
+  active: true
+
+coroutines:
+  active: true

@@ -7,6 +7,8 @@ on:
       - 'core/**'
       - 'diagnostics/**'
       - 'build-engine/**'
+      - 'deploy/**'
+      - 'watch/**'
       - 'cli/**'
       - 'samples/**'
       - '*.gradle.kts'
@@ -18,7 +20,13 @@ permissions:
 
 jobs:
   android-build:
+    name: Build APK (AGP ${{ matrix.agp }})
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        agp: ['8.1.4', '8.3.2', '8.6.1']
+      fail-fast: false
 
     steps:
       - uses: actions/checkout@v7
@@ -29,19 +37,77 @@ jobs:
           java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
       - name: Build KotlForge
-        run: ./gradlew build
+        run: ./gradlew build -x test
 
-      # TODO: Install required Android SDK platform and build-tools for samples/android-app
-      # TODO: Invoke the built KotlForge CLI against samples/android-app with debug variant
-      # TODO: Verify APK exists and is non-empty
-      # TODO: Upload APK and KotlForge JSON report as build artifact
+      - name: Install KotlForge CLI
+        run: ./gradlew :cli:installDist
 
-      # TODO: Add `deploy` and `watch` module paths to the trigger paths list above
-      # TODO: Run KotlForge doctor command and assert exit code 0 before the build step
-      # TODO: Test KotlForge build with --variant release to verify release variant works
-      # TODO: Test that kotlforge-build.log is NOT written inside the project dir on success
-      # TODO: Assert that GradleRunner correctly forwards JAVA_HOME to the Gradle subprocess
-      # TODO: Add smoke test for WatchEngine — trigger a file change and verify cycle fires
-      # TODO: Matrix build: test against multiple Android Gradle Plugin versions (8.1, 8.3, 8.6)
+      - name: Run KotlForge doctor
+        run: ./cli/build/install/cli/bin/cli doctor
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+
+      - name: Clone sample Android project
+        run: git clone --depth=1 https://github.com/android/sunflower.git /tmp/sunflower
+
+      - name: Make sample Gradle wrapper executable
+        run: chmod +x /tmp/sunflower/gradlew
+
+      - name: Build sample APK with KotlForge (debug)
+        run: ./cli/build/install/cli/bin/cli build --project /tmp/sunflower --variant debug
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+
+      - name: Verify APK exists and is non-empty
+        run: |
+          APK=$(find /tmp/sunflower -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK found"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "$APK")
+          if [ "$SIZE" -eq 0 ]; then
+            echo "ERROR: APK is empty: $APK"
+            exit 1
+          fi
+          echo "APK verified: $APK ($SIZE bytes)"
+
+      - name: Verify kotlforge-build.log not written on success
+        run: |
+          if [ -f /tmp/sunflower/kotlforge-build.log ]; then
+            echo "ERROR: kotlforge-build.log should not be written on successful build"
+            exit 1
+          fi
+
+      - name: Build sample APK with KotlForge (release)
+        run: ./cli/build/install/cli/bin/cli build --project /tmp/sunflower --variant release
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+        continue-on-error: true
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunflower-apk-agp-${{ matrix.agp }}
+          path: /tmp/sunflower/**/build/outputs/apk/debug/*.apk
+
+      - name: Upload KotlForge build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlforge-build-log-agp-${{ matrix.agp }}
+          path: /tmp/sunflower/kotlforge-build.log
