@@ -74,4 +74,23 @@ class GradleRunnerTest {
         assertFalse(result.success)
         assertEquals(1, result.exitCode)
     }
+
+    @Test
+    fun `resolveGradleTasks returns assembleDebug for debug variant`() {
+        val runner = GradleRunner()
+        assertEquals(listOf("assembleDebug"), runner.resolveGradleTasks(BuildRequest(projectDir = ".", variant = "debug")))
+    }
+
+    @Test
+    fun `resolveGradleTasks returns assembleRelease for release variant`() {
+        val runner = GradleRunner()
+        assertEquals(listOf("assembleRelease"), runner.resolveGradleTasks(BuildRequest(projectDir = ".", variant = "release")))
+    }
+
+    @Test
+    fun `resolveGradleTasks uses explicit tasks when provided`() {
+        val runner = GradleRunner()
+        val tasks = listOf("bundleRelease", "test")
+        assertEquals(tasks, runner.resolveGradleTasks(BuildRequest(projectDir = ".", tasks = tasks)))
+    }
 }
