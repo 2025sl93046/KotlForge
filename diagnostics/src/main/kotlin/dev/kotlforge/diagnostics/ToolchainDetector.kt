@@ -7,12 +7,32 @@ import java.io.File
 
 class ToolchainDetector {
 
+    companion object {
+        /** Standard SDK locations tried when no env var is set, in priority order. */
+        internal val STANDARD_SDK_PATHS: List<String> = listOf(
+            "${System.getProperty("user.home")}/Library/Android/sdk",          // macOS (Android Studio)
+            "${System.getProperty("user.home")}/Android/Sdk",                  // Linux (Android Studio)
+            "/opt/homebrew/share/android-commandlinetools",                     // macOS Homebrew
+            "/usr/lib/android-sdk",                                             // Linux package manager
+            "${System.getenv("LOCALAPPDATA")}\\Android\\Sdk"                   // Windows
+        )
+    }
+
     fun detect(): ToolchainInfo {
         return ToolchainInfo(
             jdkPath = System.getenv("JAVA_HOME"),
-            androidSdkPath = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT"),
+            androidSdkPath = resolveAndroidSdkPath(),
             gradleVersion = null
         )
+    }
+
+    internal fun resolveAndroidSdkPath(): String? {
+        // 1. Explicit env vars take priority
+        val fromEnv = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+        if (fromEnv != null) return fromEnv
+
+        // 2. Fall back to standard platform paths
+        return STANDARD_SDK_PATHS.firstOrNull { File(it).isDirectory }
     }
 
     fun checks(info: ToolchainInfo): List<Diagnostic> {

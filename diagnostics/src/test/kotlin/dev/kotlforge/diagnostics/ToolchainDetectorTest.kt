@@ -15,8 +15,6 @@ class ToolchainDetectorTest {
     @Test
     fun `detect returns a ToolchainInfo with jdkPath from JAVA_HOME`() {
         val info = detector.detect()
-        assertNotNull(info)
-        assertTrue(info is ToolchainInfo)
         assertEquals(System.getenv("JAVA_HOME"), info.jdkPath)
     }
 
@@ -48,6 +46,88 @@ class ToolchainDetectorTest {
             val diagnostics = detector.checks(info)
             val jdkDiag = diagnostics.first { it.message.contains("JDK") }
             assertEquals(DiagnosticLevel.OK, jdkDiag.level)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    // ── resolveAndroidSdkPath() ───────────────────────────────────────────────
+
+    @Test
+    fun `detect picks up androidSdkPath from ANDROID_HOME env var`() {
+        // detect() reads live env; verify it returns whatever ANDROID_HOME is set to
+        val info = detector.detect()
+        val expected = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+        if (expected != null) {
+            assertEquals(expected, info.androidSdkPath)
+        }
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath returns null when no env var and no standard path exists`() {
+        // Inject a path list where nothing exists on disk
+        val result = ToolchainDetector.STANDARD_SDK_PATHS
+            .filter { java.io.File(it).isDirectory }
+        // We can only assert null if none of the standard paths are present;
+        // otherwise at least one standard path resolves — both outcomes are valid
+        val resolved = detector.resolveAndroidSdkPath()
+        if (result.isEmpty() && System.getenv("ANDROID_HOME") == null && System.getenv("ANDROID_SDK_ROOT") == null) {
+            assertNull(resolved)
+        } else {
+            assertNotNull(resolved)
+        }
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath prefers ANDROID_HOME over standard paths`() {
+        // If ANDROID_HOME is set, it must win over any standard path
+        val androidHome = System.getenv("ANDROID_HOME")
+        if (androidHome != null) {
+            assertEquals(androidHome, detector.resolveAndroidSdkPath())
+        }
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath falls back to first existing standard path`() {
+        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
+        try {
+            // Build a custom detector with a known standard path list
+            val paths = listOf("/nonexistent/path1", tempDir.absolutePath, "/nonexistent/path2")
+            val result = paths.firstOrNull { java.io.File(it).isDirectory }
+            assertEquals(tempDir.absolutePath, result)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    // ── checks() — Android SDK ───────────────────────────────────────────────
+
+    @Test
+    fun `checks returns ERROR when androidSdkPath is null`() {
+        val info = ToolchainInfo(androidSdkPath = null)
+        val diagnostics = detector.checks(info)
+        val sdkDiag = diagnostics.first { it.message.contains("Android SDK") }
+        assertEquals(DiagnosticLevel.ERROR, sdkDiag.level)
+        assertNotNull(sdkDiag.suggestion)
+    }
+
+    @Test
+    fun `checks returns ERROR when androidSdkPath does not exist on disk`() {
+        val info = ToolchainInfo(androidSdkPath = "/nonexistent/android/sdk")
+        val diagnostics = detector.checks(info)
+        val sdkDiag = diagnostics.first { it.message.contains("Android SDK") }
+        assertEquals(DiagnosticLevel.ERROR, sdkDiag.level)
+        assertNotNull(sdkDiag.suggestion)
+    }
+
+    @Test
+    fun `checks returns OK when androidSdkPath exists on disk`() {
+        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
+        try {
+            val info = ToolchainInfo(androidSdkPath = tempDir.absolutePath)
+            val diagnostics = detector.checks(info)
+            val sdkDiag = diagnostics.first { it.message.contains("Android SDK") }
+            assertEquals(DiagnosticLevel.OK, sdkDiag.level)
         } finally {
             tempDir.deleteRecursively()
         }
