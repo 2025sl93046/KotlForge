@@ -36,4 +36,12 @@ jobs:
       # TODO: Install required Android SDK platform and build-tools for samples/android-app
       # TODO: Invoke the built KotlForge CLI against samples/android-app with debug variant
       # TODO: Verify APK exists and is non-empty
-      # TODO: Upload APK and KotlForge JSON report
+      # TODO: Upload APK and KotlForge JSON report as build artifact
+
+      # TODO: Add `deploy` and `watch` module paths to the trigger paths list above
+      # TODO: Run KotlForge doctor command and assert exit code 0 before the build step
+      # TODO: Test KotlForge build with --variant release to verify release variant works
+      # TODO: Test that kotlforge-build.log is NOT written inside the project dir on success
+      # TODO: Assert that GradleRunner correctly forwards JAVA_HOME to the Gradle subprocess
+      # TODO: Add smoke test for WatchEngine — trigger a file change and verify cycle fires
+      # TODO: Matrix build: test against multiple Android Gradle Plugin versions (8.1, 8.3, 8.6)

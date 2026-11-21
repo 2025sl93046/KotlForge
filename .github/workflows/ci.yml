@@ -32,3 +32,10 @@ jobs:
 
       - name: Run checks
         run: ./gradlew clean check
+
+      # TODO: Add detekt static analysis step (./gradlew detekt) and publish report as artifact
+      # TODO: Add code coverage reporting (Kover) and enforce minimum threshold (e.g. 80%)
+      # TODO: Split into parallel jobs: unit-tests, detekt, build — to reduce wall-clock time
+      # TODO: Add caching for ~/.gradle/caches and ~/.gradle/wrapper to speed up builds
+      # TODO: Fail fast on KotlinCompilerWarning — add -Werror to Kotlin compile options
+      # TODO: Add check that CONTRIBUTING.md / docs are updated when new modules are added
