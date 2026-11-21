@@ -19,7 +19,7 @@ class GradleRunnerTest {
     fun `returns failed result when gradlew is missing`() {
         val runner = GradleRunner()
         val request = BuildRequest(projectDir = System.getProperty("java.io.tmpdir") + "/nonexistent-project-12345")
-        val result = runner.run(request)
+        val result = runner.build(request)
         assertFalse(result.success)
         assertEquals(3, result.exitCode)
         assertTrue(result.diagnostics.first().message.contains("not found"))
@@ -30,7 +30,7 @@ class GradleRunnerTest {
         val wrapper = File(tempDir, "gradlew").also { it.createNewFile() }
         wrapper.setExecutable(false)
         val runner = GradleRunner()
-        val result = runner.run(BuildRequest(projectDir = tempDir.absolutePath))
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath))
         assertFalse(result.success)
         assertEquals(3, result.exitCode)
         val suggestion = result.diagnostics.first().suggestion ?: ""
@@ -53,7 +53,7 @@ class GradleRunnerTest {
     }
 
     @Test
-    fun `run delegates to ProcessRunner with correct command`(@TempDir tempDir: File) {
+    fun `build delegates to ProcessRunner with correct command`(@TempDir tempDir: File) {
         File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
 
         val mockRunner = mockk<ProcessRunner>()
@@ -62,7 +62,7 @@ class GradleRunnerTest {
         } returns ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 100)
 
         val runner = GradleRunner(processRunner = mockRunner)
-        runner.run(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+        runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
 
         verify {
             mockRunner.run(
@@ -74,7 +74,7 @@ class GradleRunnerTest {
     }
 
     @Test
-    fun `run returns failed result when ProcessRunner exits non-zero`(@TempDir tempDir: File) {
+    fun `build returns failed result when ProcessRunner exits non-zero`(@TempDir tempDir: File) {
         File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
 
         val mockRunner = mockk<ProcessRunner>()
@@ -82,7 +82,7 @@ class GradleRunnerTest {
                 ProcessResult(exitCode = 1, stdout = "", stderr = "error", durationMillis = 100)
 
         val runner = GradleRunner(processRunner = mockRunner)
-        val result = runner.run(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
 
         assertFalse(result.success)
         assertEquals(1, result.exitCode)
@@ -102,7 +102,7 @@ class GradleRunnerTest {
                 ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
 
         val runner = GradleRunner(processRunner = mockRunner)
-        val result = runner.run(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
 
         assertTrue(result.success)
         assertEquals(apk.absolutePath, result.artifacts.first().path)
@@ -110,7 +110,7 @@ class GradleRunnerTest {
     }
 
     @Test
-    fun `run returns failed result when APK is empty (0 bytes)`(@TempDir tempDir: File) {
+    fun `build returns failed result when APK is empty (0 bytes)`(@TempDir tempDir: File) {
         File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
         val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
         File(apkDir, "app-debug.apk").also { it.createNewFile() }
@@ -120,7 +120,7 @@ class GradleRunnerTest {
                 ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
 
         val runner = GradleRunner(processRunner = mockRunner)
-        val result = runner.run(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
 
         assertFalse(result.success)
         assertTrue(result.artifacts.isEmpty())
