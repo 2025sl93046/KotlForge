@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serial)
     application
 }
 
@@ -14,6 +15,7 @@ dependencies {
     implementation(project(":deploy"))
     implementation(project(":watch"))
     implementation(libs.clikt)
+    implementation(libs.kotlinx.serialization)
     implementation(libs.kotlin.logging)
     runtimeOnly(libs.logback)
     testImplementation(libs.junit5)
