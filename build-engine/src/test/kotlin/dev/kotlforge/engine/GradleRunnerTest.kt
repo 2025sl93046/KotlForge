@@ -64,7 +64,7 @@ class GradleRunnerTest {
     fun `findApk locates APK at Gradle standard output path`(@TempDir tempDir: File) {
         File(tempDir, "gradlew").also { it.createNewFile() }
         val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
-        val apk = File(apkDir, "app-debug.apk").also { it.createNewFile() }
+        val apk = File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
 
         val mockRunner = mockk<ProcessRunner>()
         every { mockRunner.run(any(), any(), any()) } returns
@@ -75,6 +75,24 @@ class GradleRunnerTest {
 
         assertTrue(result.success)
         assertEquals(apk.absolutePath, result.artifacts.first().path)
+        assertEquals(1024L, result.artifacts.first().sizeBytes)
+    }
+
+    @Test
+    fun `build returns failed result when APK is empty (0 bytes)`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile() }
+        val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apkDir, "app-debug.apk").also { it.createNewFile() }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+
+        assertFalse(result.success)
+        assertTrue(result.artifacts.isEmpty())
     }
 
     @Test
