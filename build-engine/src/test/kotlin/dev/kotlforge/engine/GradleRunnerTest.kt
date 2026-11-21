@@ -22,6 +22,19 @@ class GradleRunnerTest {
         val result = runner.build(request)
         assertFalse(result.success)
         assertEquals(3, result.exitCode)
+        assertTrue(result.diagnostics.first().message.contains("not found"))
+    }
+
+    @Test
+    fun `returns failed result with chmod suggestion when gradlew is not executable`(@TempDir tempDir: File) {
+        val wrapper = File(tempDir, "gradlew").also { it.createNewFile() }
+        wrapper.setExecutable(false)
+        val runner = GradleRunner()
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath))
+        assertFalse(result.success)
+        assertEquals(3, result.exitCode)
+        val suggestion = result.diagnostics.first().suggestion ?: ""
+        assertTrue(suggestion.contains("chmod"))
     }
 
     @Test
@@ -41,7 +54,7 @@ class GradleRunnerTest {
 
     @Test
     fun `build delegates to ProcessRunner with correct command`(@TempDir tempDir: File) {
-        File(tempDir, "gradlew").also { it.createNewFile() }
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
 
         val mockRunner = mockk<ProcessRunner>()
         every {
@@ -62,7 +75,7 @@ class GradleRunnerTest {
 
     @Test
     fun `build returns failed result when ProcessRunner exits non-zero`(@TempDir tempDir: File) {
-        File(tempDir, "gradlew").also { it.createNewFile() }
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
 
         val mockRunner = mockk<ProcessRunner>()
         every { mockRunner.run(any(), any(), any()) } returns
@@ -80,7 +93,7 @@ class GradleRunnerTest {
 
     @Test
     fun `findApk locates APK at Gradle standard output path`(@TempDir tempDir: File) {
-        File(tempDir, "gradlew").also { it.createNewFile() }
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
         val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
         val apk = File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
 
@@ -98,7 +111,7 @@ class GradleRunnerTest {
 
     @Test
     fun `build returns failed result when APK is empty (0 bytes)`(@TempDir tempDir: File) {
-        File(tempDir, "gradlew").also { it.createNewFile() }
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
         val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
         File(apkDir, "app-debug.apk").also { it.createNewFile() }
 
@@ -124,7 +137,7 @@ class GradleRunnerTest {
 
     @Test
     fun `build returns failed BuildResult on non-zero exit code`(@TempDir tempDir: File) {
-        File(tempDir, "gradlew").also { it.createNewFile() }
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
 
         val mockRunner = mockk<ProcessRunner>()
         every {

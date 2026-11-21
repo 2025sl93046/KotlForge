@@ -29,6 +29,21 @@ class GradleRunner(
                 )
             )
 
+        if (!isWindows() && !wrapper.canExecute()) {
+            return BuildResult(
+                success = false,
+                exitCode = 3,
+                durationMillis = 0,
+                diagnostics = listOf(
+                    Diagnostic(
+                        level = DiagnosticLevel.ERROR,
+                        message = "Gradle wrapper is not executable: ${wrapper.absolutePath}",
+                        suggestion = "Run: chmod +x ${wrapper.absolutePath}"
+                    )
+                )
+            )
+        }
+
         val tasks = resolveGradleTasks(request)
         val result = processRunner.run(
             command = listOf(wrapper.absolutePath) + tasks,
