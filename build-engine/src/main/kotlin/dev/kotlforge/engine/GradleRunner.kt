@@ -2,6 +2,7 @@ package dev.kotlforge.engine
 
 import dev.kotlforge.core.ArtifactType
 import dev.kotlforge.core.BuildArtifact
+import dev.kotlforge.core.BuildEngine
 import dev.kotlforge.core.BuildRequest
 import dev.kotlforge.core.BuildResult
 import dev.kotlforge.core.Diagnostic
@@ -10,9 +11,9 @@ import java.io.File
 
 class GradleRunner(
     private val processRunner: ProcessRunner = DefaultProcessRunner()
-) {
+) : BuildEngine {
 
-    fun run(request: BuildRequest): BuildResult {
+    override fun build(request: BuildRequest): BuildResult {
         val projectDir = File(request.projectDir)
         val wrapper = locateWrapper(projectDir)
             ?: return BuildResult(

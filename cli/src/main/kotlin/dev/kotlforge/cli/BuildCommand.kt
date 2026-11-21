@@ -15,13 +15,14 @@ class BuildCommand : CliktCommand(
 
     override fun run() {
         echo("Building $variant variant at: $projectPath")
-        val result = GradleRunner().run(BuildRequest(projectDir = projectPath, variant = variant))
+        val result = GradleRunner().build(BuildRequest(projectDir = projectPath, variant = variant))
         if (result.success) {
             echo("Build successful")
             result.artifacts.forEach { echo("APK: ${it.path}") }
         } else {
             val error = result.diagnostics.firstOrNull()
-            echo("Build failed: ${error?.message ?: "unknown error"}")
+            echo("Build failed (exit ${result.exitCode}): ${error?.message ?: "unknown error"}")
+            if (error?.suggestion != null) echo("Suggestion: ${error.suggestion}")
         }
     }
 }
