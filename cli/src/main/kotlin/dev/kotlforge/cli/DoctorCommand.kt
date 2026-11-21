@@ -1,6 +1,7 @@
 package dev.kotlforge.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.ProgramResult
 import dev.kotlforge.diagnostics.ToolchainDetector
 
 class DoctorCommand : CliktCommand(
@@ -20,6 +21,7 @@ class DoctorCommand : CliktCommand(
             echo("  Status: OK")
         } else {
             errors.forEach { echo("  ERROR: $it") }
+            throw ProgramResult(ExitCode.ENV_FAILED)
         }
     }
 }

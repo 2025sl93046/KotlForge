@@ -1,6 +1,7 @@
 package dev.kotlforge.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import dev.kotlforge.core.BuildRequest
@@ -27,7 +28,7 @@ class DeployCommand : CliktCommand(
             echo("Pairing with $pairAddress...")
             val result = deployer.pair(pairAddress!!, code)
             echo(result.message)
-            if (!result.success) throw com.github.ajalt.clikt.core.ProgramResult(3)
+            if (!result.success) throw ProgramResult(ExitCode.ENV_FAILED)
             return
         }
 
@@ -36,7 +37,7 @@ class DeployCommand : CliktCommand(
             echo("Connecting to $connectAddress...")
             val result = deployer.connect(connectAddress!!)
             echo(result.message)
-            if (!result.success) throw com.github.ajalt.clikt.core.ProgramResult(3)
+            if (!result.success) throw ProgramResult(ExitCode.ENV_FAILED)
             return
         }
 
@@ -46,18 +47,18 @@ class DeployCommand : CliktCommand(
         if (!buildResult.success) {
             val error = buildResult.diagnostics.firstOrNull()
             echo("Build failed (exit ${buildResult.exitCode}): ${error?.message ?: "unknown error"}")
-            throw com.github.ajalt.clikt.core.ProgramResult(buildResult.exitCode)
+            throw ProgramResult(ExitCode.BUILD_FAILED)
         }
 
         val apk = buildResult.artifacts.firstOrNull()
         if (apk == null) {
             echo("Build succeeded but no APK found")
-            throw com.github.ajalt.clikt.core.ProgramResult(1)
+            throw ProgramResult(ExitCode.BUILD_FAILED)
         }
 
         echo("Installing ${apk.path}...")
         val deployResult = deployer.deploy(apk.path, deviceSerial)
         echo(deployResult.message)
-        if (!deployResult.success) throw com.github.ajalt.clikt.core.ProgramResult(1)
+        if (!deployResult.success) throw ProgramResult(ExitCode.BUILD_FAILED)
     }
 }
