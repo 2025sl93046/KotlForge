@@ -171,6 +171,92 @@ class GradleRunnerTest {
     }
 
     @Test
+    fun `findAab locates AAB at Gradle bundle output path`(@TempDir tempDir: File) {
+        val aabDir = File(tempDir, "app/build/outputs/bundle/release").also { it.mkdirs() }
+        val aab = File(aabDir, "app-release.aab").also { it.writeBytes(ByteArray(2048)) }
+        val runner = GradleRunner()
+        assertEquals(aab.absolutePath, runner.findAab(tempDir, "release"))
+    }
+
+    @Test
+    fun `findAab returns null when no AAB is present`(@TempDir tempDir: File) {
+        val runner = GradleRunner()
+        assertNull(runner.findAab(tempDir, "debug"))
+    }
+
+    @Test
+    fun `build includes AAB artifact when only AAB is produced`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val aabDir = File(tempDir, "app/build/outputs/bundle/release").also { it.mkdirs() }
+        File(aabDir, "app-release.aab").also { it.writeBytes(ByteArray(4096)) }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "release", tasks = listOf("bundleRelease")))
+
+        assertTrue(result.success)
+        assertEquals(1, result.artifacts.size)
+        assertEquals(dev.kotlforge.core.ArtifactType.AAB, result.artifacts.first().type)
+        assertEquals(4096L, result.artifacts.first().sizeBytes)
+    }
+
+    @Test
+    fun `build includes both APK and AAB when both are present`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
+        val aabDir = File(tempDir, "app/build/outputs/bundle/debug").also { it.mkdirs() }
+        File(aabDir, "app-debug.aab").also { it.writeBytes(ByteArray(2048)) }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+
+        assertTrue(result.success)
+        assertEquals(2, result.artifacts.size)
+        assertTrue(result.artifacts.any { it.type == dev.kotlforge.core.ArtifactType.APK })
+        assertTrue(result.artifacts.any { it.type == dev.kotlforge.core.ArtifactType.AAB })
+    }
+
+    @Test
+    fun `build fails when AAB is empty zero bytes`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val aabDir = File(tempDir, "app/build/outputs/bundle/release").also { it.mkdirs() }
+        File(aabDir, "app-release.aab").also { it.createNewFile() }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "release", tasks = listOf("bundleRelease")))
+
+        assertFalse(result.success)
+        assertTrue(result.artifacts.isEmpty())
+    }
+
+    @Test
+    fun `build fails with no APK or AAB message when neither is produced`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath, variant = "debug"))
+
+        assertFalse(result.success)
+        assertTrue(result.diagnostics.first().message.contains("No APK or AAB"))
+    }
+
+    @Test
     fun `findApks discovers APK in app module`(@TempDir tempDir: File) {
         val apkDir = File(tempDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
         val apk = File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }

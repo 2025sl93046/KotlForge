@@ -73,14 +73,20 @@ class GradleRunner(
                 val size = File(path).length()
                 if (size > 0L) add(BuildArtifact(type = ArtifactType.APK, path = path, sizeBytes = size))
             }
+            findAab(projectDir, request.variant)?.let { path ->
+                val size = File(path).length()
+                if (size > 0L) add(BuildArtifact(type = ArtifactType.AAB, path = path, sizeBytes = size))
+            }
         }
 
         if (artifacts.isEmpty()) {
-            val candidates = findApks(projectDir, request.variant)
-            val message = if (candidates.isNotEmpty())
-                "APK(s) were produced but are empty (0 bytes): ${candidates.joinToString()}"
-            else
-                "No APK found for variant '${request.variant}'"
+            val apkCandidates = findApks(projectDir, request.variant)
+            val aabPath = findAab(projectDir, request.variant)
+            val message = when {
+                apkCandidates.isNotEmpty() -> "APK(s) were produced but are empty (0 bytes): ${apkCandidates.joinToString()}"
+                aabPath != null -> "AAB was produced but is empty (0 bytes): $aabPath"
+                else -> "No APK or AAB found for variant '${request.variant}'"
+            }
             return BuildResult(
                 success = false,
                 exitCode = result.exitCode,
@@ -150,6 +156,21 @@ class GradleRunner(
             .mapTo(results) { it.absolutePath }
 
         return results
+    }
+
+    internal fun findAab(projectDir: File, variant: String): String? {
+        // Gradle bundle output convention: app/build/outputs/bundle/<variant>/
+        val conventional = File(projectDir, "app/build/outputs/bundle/$variant")
+            .walkTopDown()
+            .filter { it.extension == "aab" }
+            .firstOrNull()
+        if (conventional != null) return conventional.absolutePath
+
+        // Fallback: scan the whole tree
+        return projectDir.walkTopDown()
+            .filter { it.extension == "aab" && it.path.contains(variant, ignoreCase = true) }
+            .firstOrNull()
+            ?.absolutePath
     }
 
     private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
