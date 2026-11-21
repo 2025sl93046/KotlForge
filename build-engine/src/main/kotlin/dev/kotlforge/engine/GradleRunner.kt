@@ -9,50 +9,44 @@ import dev.kotlforge.core.Diagnostic
 import dev.kotlforge.core.DiagnosticLevel
 import java.io.File
 
-class GradleRunner : BuildEngine {
+class GradleRunner(
+    private val processRunner: ProcessRunner = DefaultProcessRunner()
+) : BuildEngine {
 
     override fun build(request: BuildRequest): BuildResult {
         val projectDir = File(request.projectDir)
-        val wrapper = File(projectDir, if (isWindows()) "gradlew.bat" else "gradlew")
-        val start = System.currentTimeMillis()
-
-        if (!wrapper.exists()) {
-            return BuildResult(
+        val wrapper = locateWrapper(projectDir)
+            ?: return BuildResult(
                 success = false,
                 exitCode = 3,
                 durationMillis = 0,
-                diagnostics = listOf(Diagnostic(
-                    level = DiagnosticLevel.ERROR,
-                    message = "Gradle wrapper not found at ${wrapper.absolutePath}",
-                    suggestion = "Make sure the project has a gradlew file at its root"
-                ))
+                diagnostics = listOf(
+                    Diagnostic(
+                        level = DiagnosticLevel.ERROR,
+                        message = "Gradle wrapper not found in ${projectDir.absolutePath}",
+                        suggestion = "Make sure the project has a gradlew file at its root"
+                    )
+                )
             )
-        }
 
-        val pb = ProcessBuilder(wrapper.absolutePath, "assemble${request.variant.replaceFirstChar { it.uppercaseChar() }}")
-            .directory(projectDir)
-            .redirectErrorStream(true)
+        val task = "assemble${request.variant.replaceFirstChar { it.uppercaseChar() }}"
+        val result = processRunner.run(
+            command = listOf(wrapper.absolutePath, task),
+            workingDir = projectDir
+        )
 
-        pb.environment()["ANDROID_HOME"] = System.getenv("ANDROID_HOME") ?: ""
-        System.getenv("JAVA_HOME")?.let { pb.environment()["JAVA_HOME"] = it }
-
-        val process = pb.start()
-
-        val output = process.inputStream.bufferedReader().readText()
-        val exitCode = process.waitFor()
-        val duration = System.currentTimeMillis() - start
-
-        if (exitCode != 0) {
-            println(output)
+        if (result.exitCode != 0) {
             return BuildResult(
                 success = false,
-                exitCode = exitCode,
-                durationMillis = duration,
-                diagnostics = listOf(Diagnostic(
-                    level = DiagnosticLevel.ERROR,
-                    message = "Build failed with exit code $exitCode",
-                    suggestion = output.lines().lastOrNull { it.isNotBlank() } ?: "Check the Gradle output for details"
-                ))
+                exitCode = result.exitCode,
+                durationMillis = result.durationMillis,
+                diagnostics = listOf(
+                    Diagnostic(
+                        level = DiagnosticLevel.ERROR,
+                        message = "Build failed with exit code ${result.exitCode}",
+                        suggestion = "Check the Gradle output for details"
+                    )
+                )
             )
         }
 
@@ -63,10 +57,16 @@ class GradleRunner : BuildEngine {
 
         return BuildResult(
             success = apk != null,
-            exitCode = exitCode,
-            durationMillis = duration,
+            exitCode = result.exitCode,
+            durationMillis = result.durationMillis,
             artifacts = artifacts
         )
+    }
+
+    internal fun locateWrapper(projectDir: File): File? {
+        val name = if (isWindows()) "gradlew.bat" else "gradlew"
+        val wrapper = File(projectDir, name)
+        return if (wrapper.exists() && wrapper.isFile) wrapper else null
     }
 
     private fun findApk(projectDir: File, variant: String): String? {
