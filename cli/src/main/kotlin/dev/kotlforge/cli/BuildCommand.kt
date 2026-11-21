@@ -1,6 +1,7 @@
 package dev.kotlforge.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import dev.kotlforge.core.BuildRequest
@@ -23,6 +24,7 @@ class BuildCommand : CliktCommand(
             val error = result.diagnostics.firstOrNull()
             echo("Build failed (exit ${result.exitCode}): ${error?.message ?: "unknown error"}")
             if (error?.suggestion != null) echo("Suggestion: ${error.suggestion}")
+            throw ProgramResult(ExitCode.BUILD_FAILED)
         }
     }
 }
