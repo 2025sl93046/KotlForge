@@ -65,7 +65,10 @@ class DeviceDeployer(
             ?: return DeployResult(success = false, message = "ADB not found. Set ANDROID_HOME or add adb to PATH.")
 
         return WifiConnector(adb, processRunner).connect(ipPort).fold(
-            onSuccess = { DeployResult(success = true, message = "Connected to $ipPort") },
+            onSuccess = {
+                DeviceStore.default.save(PairedDevice(ipPort = ipPort))
+                DeployResult(success = true, message = "Connected to $ipPort (saved for reuse)")
+            },
             onFailure = { DeployResult(success = false, message = it.message ?: "Connection failed") }
         )
     }
