@@ -4,5 +4,6 @@ include(
     ":core",
     ":diagnostics",
     ":build-engine",
+    ":deploy",
     ":cli"
 )
