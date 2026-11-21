@@ -123,6 +123,22 @@ class GradleRunnerTest {
     }
 
     @Test
+    fun `build returns failed BuildResult on non-zero exit code`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile() }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every {
+            mockRunner.run(any(), any(), any())
+        } returns ProcessResult(exitCode = 1, stdout = "", stderr = "FAILURE", durationMillis = 200)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = tempDir.absolutePath))
+
+        assertFalse(result.success)
+        assertEquals(1, result.exitCode)
+    }
+
+    @Test
     fun `resolveGradleTasks returns assembleDebug for debug variant`() {
         val runner = GradleRunner()
         assertEquals(listOf("assembleDebug"), runner.resolveGradleTasks(BuildRequest(projectDir = ".", variant = "debug")))
@@ -141,4 +157,3 @@ class GradleRunnerTest {
         assertEquals(tasks, runner.resolveGradleTasks(BuildRequest(projectDir = ".", tasks = tasks)))
     }
 }
-
