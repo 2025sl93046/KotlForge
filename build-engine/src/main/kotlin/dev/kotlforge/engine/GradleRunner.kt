@@ -68,13 +68,19 @@ class GradleRunner(
             )
         }
 
-        val apk = findApk(projectDir, request.variant)
-        val apkFile = apk?.let { File(it) }
-        val apkSize = apkFile?.length() ?: 0L
+        val artifacts = buildList {
+            findApks(projectDir, request.variant).forEach { path ->
+                val size = File(path).length()
+                if (size > 0L) add(BuildArtifact(type = ArtifactType.APK, path = path, sizeBytes = size))
+            }
+        }
 
-        if (apkFile == null || apkSize == 0L) {
-            val message = if (apkFile != null) "APK was produced but is empty (0 bytes): $apk"
-                          else "No APK found for variant '${request.variant}'"
+        if (artifacts.isEmpty()) {
+            val candidates = findApks(projectDir, request.variant)
+            val message = if (candidates.isNotEmpty())
+                "APK(s) were produced but are empty (0 bytes): ${candidates.joinToString()}"
+            else
+                "No APK found for variant '${request.variant}'"
             return BuildResult(
                 success = false,
                 exitCode = result.exitCode,
@@ -93,7 +99,7 @@ class GradleRunner(
             success = true,
             exitCode = result.exitCode,
             durationMillis = result.durationMillis,
-            artifacts = listOf(BuildArtifact(type = ArtifactType.APK, path = apk, sizeBytes = apkSize))
+            artifacts = artifacts
         )
     }
 
@@ -123,19 +129,27 @@ class GradleRunner(
         return if (wrapper.exists() && wrapper.isFile) wrapper else null
     }
 
-    private fun findApk(projectDir: File, variant: String): String? {
-        // Gradle standard output convention: app/build/outputs/apk/<variant>/
-        val conventional = File(projectDir, "app/build/outputs/apk/$variant")
-            .walkTopDown()
-            .filter { it.extension == "apk" }
-            .firstOrNull()
-        if (conventional != null) return conventional.absolutePath
+    internal fun findApks(projectDir: File, variant: String): List<String> {
+        val results = mutableListOf<String>()
 
-        // Fallback: scan the whole tree (multi-module or custom layouts)
-        return projectDir.walkTopDown()
-            .filter { it.extension == "apk" && it.path.contains(variant, ignoreCase = true) }
-            .firstOrNull()
-            ?.absolutePath
+        // Scan all direct subdirectories: <module>/build/outputs/apk/<variant>/
+        projectDir.listFiles()
+            ?.filter { it.isDirectory && it.name != "build" }
+            ?.forEach { moduleDir ->
+                File(moduleDir, "build/outputs/apk/$variant")
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "apk" }
+                    .mapTo(results) { it.absolutePath }
+            }
+
+        if (results.isNotEmpty()) return results
+
+        // Fallback: scan the whole tree (custom layouts or deeply nested modules)
+        projectDir.walkTopDown()
+            .filter { it.isFile && it.extension == "apk" && it.path.contains(variant, ignoreCase = true) }
+            .mapTo(results) { it.absolutePath }
+
+        return results
     }
 
     private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
