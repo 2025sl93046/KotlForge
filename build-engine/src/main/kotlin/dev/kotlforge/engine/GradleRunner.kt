@@ -50,9 +50,8 @@ class GradleRunner(
             workingDir = projectDir
         )
 
-        writeRawLog(projectDir, result.stdout, result.stderr)
-
         if (result.exitCode != 0) {
+            writeRawLog(projectDir, result.stdout, result.stderr)
             val logPath = File(projectDir, "kotlforge-build.log").absolutePath
             return BuildResult(
                 success = false,
