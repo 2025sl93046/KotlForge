@@ -33,10 +33,20 @@ class InspectCommand : CliktCommand(
 
         echo("KotlForge Inspect: $root")
         echo("")
+        val wrapperStatus = if (gradlew.exists()) {
+            "found${if (gradleVersion != null) " (Gradle $gradleVersion)" else ""}"
+        } else {
+            "MISSING — run `gradle wrapper` to create it"
+        }
+        val configStatus = if (root.resolve("kotlforge.json").exists()) {
+            "kotlforge.json (found)"
+        } else {
+            "(none — using defaults)"
+        }
         echo("  Project root:    $root")
         echo("  Project name:    ${name ?: "(unknown)"}")
-        echo("  Gradle wrapper:  ${if (gradlew.exists()) "found${if (gradleVersion != null) " (Gradle $gradleVersion)" else ""}" else "MISSING — run `gradle wrapper` to create it"}")
-        echo("  Config file:     ${if (root.resolve("kotlforge.json").exists()) "kotlforge.json (found)" else "(none — using defaults)"}")
+        echo("  Gradle wrapper:  $wrapperStatus")
+        echo("  Config file:     $configStatus")
         echo("  Default variant: ${config.defaultVariant}")
         if (config.defaultTasks.isNotEmpty()) {
             echo("  Default tasks:   ${config.defaultTasks.joinToString(", ")}")
