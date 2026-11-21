@@ -236,4 +236,62 @@ class GradleRunnerTest {
         assertFalse(result.success)
         assertTrue(result.artifacts.isEmpty())
     }
+
+    @Test
+    fun `build succeeds when project path contains spaces`(@TempDir tempDir: File) {
+        val spacedDir = File(tempDir, "android app with spaces").also { it.mkdirs() }
+        File(spacedDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+        val apkDir = File(spacedDir, "app/build/outputs/apk/debug").also { it.mkdirs() }
+        File(apkDir, "app-debug.apk").also { it.writeBytes(ByteArray(1024)) }
+
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(any(), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        val result = runner.build(BuildRequest(projectDir = spacedDir.absolutePath))
+
+        assertTrue(result.success)
+        assertEquals(1, result.artifacts.size)
+    }
+
+    @Test
+    fun `locateWrapper finds gradlew inside path that contains spaces`(@TempDir tempDir: File) {
+        val spacedDir = File(tempDir, "my project name with spaces").also { it.mkdirs() }
+        File(spacedDir, "gradlew").also { it.createNewFile() }
+        val runner = GradleRunner()
+        val located = runner.locateWrapper(spacedDir)
+        assertNotNull(located)
+        assertTrue(located!!.absolutePath.contains("my project name with spaces"))
+    }
+
+    @Test
+    fun `build passes gradlew as absolute path so shell does not misinterpret spaces`(@TempDir tempDir: File) {
+        val spacedDir = File(tempDir, "project with spaces").also { it.mkdirs() }
+        File(spacedDir, "gradlew").also { it.createNewFile(); it.setExecutable(true) }
+
+        val capturedCommands = mutableListOf<List<String>>()
+        val mockRunner = mockk<ProcessRunner>()
+        every { mockRunner.run(capture(capturedCommands), any(), any()) } returns
+                ProcessResult(exitCode = 0, stdout = "", stderr = "", durationMillis = 50)
+
+        val runner = GradleRunner(processRunner = mockRunner)
+        runner.build(BuildRequest(projectDir = spacedDir.absolutePath))
+
+        val wrapperArg = capturedCommands.first().first()
+        assertTrue(File(wrapperArg).isAbsolute, "Wrapper path must be absolute — got: $wrapperArg")
+    }
+
+    @Test
+    fun `locateWrapper path uses platform native file separator`(@TempDir tempDir: File) {
+        File(tempDir, "gradlew").also { it.createNewFile() }
+        val runner = GradleRunner()
+        val located = runner.locateWrapper(tempDir)
+        assertNotNull(located)
+        val path = located!!.absolutePath
+        assertTrue(
+            path.contains(File.separator),
+            "Expected platform separator '${File.separator}' in path: $path"
+        )
+    }
 }
