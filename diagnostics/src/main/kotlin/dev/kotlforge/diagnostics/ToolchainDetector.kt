@@ -2,13 +2,8 @@ package dev.kotlforge.diagnostics
 
 import dev.kotlforge.core.Diagnostic
 import dev.kotlforge.core.DiagnosticLevel
+import dev.kotlforge.core.ToolchainInfo
 import java.io.File
-
-data class ToolchainInfo(
-    val jdkPath: String?,
-    val androidSdkPath: String?,
-    val gradleVersion: String?
-)
 
 class ToolchainDetector {
 
