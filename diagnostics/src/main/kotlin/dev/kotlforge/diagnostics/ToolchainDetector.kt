@@ -71,11 +71,14 @@ class ToolchainDetector {
                     message = "Android SDK: path does not exist — ${info.androidSdkPath}",
                     suggestion = "Check ANDROID_HOME points to a valid Android SDK installation"
                 ))
-            else ->
+            else -> {
+                val sdkPath = info.androidSdkPath!!
                 result.add(Diagnostic(
                     level = DiagnosticLevel.OK,
-                    message = "Android SDK: ${info.androidSdkPath}"
+                    message = "Android SDK: $sdkPath"
                 ))
+                result.addAll(checkSdkPackages(sdkPath))
+            }
         }
 
         return result
@@ -86,5 +89,50 @@ class ToolchainDetector {
         if (info.jdkPath == null) errors.add("JAVA_HOME is not set")
         if (info.androidSdkPath == null) errors.add("ANDROID_HOME is not set")
         return errors
+    }
+
+    internal fun checkSdkPackages(sdkPath: String): List<Diagnostic> {
+        val result = mutableListOf<Diagnostic>()
+        val sdk = File(sdkPath)
+
+        // platforms/android-XX — at least one must be present
+        val platformsDir = File(sdk, "platforms")
+        val installedPlatforms = platformsDir.listFiles()
+            ?.filter { it.isDirectory && it.name.startsWith("android-") }
+            ?: emptyList()
+
+        if (installedPlatforms.isEmpty()) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.ERROR,
+                message = "Android SDK: no platform installed under ${platformsDir.path}",
+                suggestion = "Run: sdkmanager \"platforms;android-35\""
+            ))
+        } else {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.OK,
+                message = "Android SDK platforms: ${installedPlatforms.map { it.name }.sorted().joinToString(", ")}"
+            ))
+        }
+
+        // build-tools/XX.Y.Z — at least one must be present
+        val buildToolsDir = File(sdk, "build-tools")
+        val installedBuildTools = buildToolsDir.listFiles()
+            ?.filter { it.isDirectory }
+            ?: emptyList()
+
+        if (installedBuildTools.isEmpty()) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.ERROR,
+                message = "Android SDK: no build-tools installed under ${buildToolsDir.path}",
+                suggestion = "Run: sdkmanager \"build-tools;35.0.0\""
+            ))
+        } else {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.OK,
+                message = "Android SDK build-tools: ${installedBuildTools.map { it.name }.sorted().joinToString(", ")}"
+            ))
+        }
+
+        return result
     }
 }
