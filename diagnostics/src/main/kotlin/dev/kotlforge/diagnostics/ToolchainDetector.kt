@@ -22,7 +22,8 @@ class ToolchainDetector {
         return ToolchainInfo(
             jdkPath = System.getenv("JAVA_HOME"),
             androidSdkPath = resolveAndroidSdkPath(),
-            gradleVersion = projectDir?.let { readGradleWrapperVersion(it) }
+            gradleVersion = projectDir?.let { readGradleWrapperVersion(it) },
+            agpVersion = projectDir?.let { readAgpVersion(it) }
         )
     }
 
@@ -93,6 +94,18 @@ class ToolchainDetector {
             ))
         }
 
+        when (info.agpVersion) {
+            null -> result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "AGP: NOT FOUND — could not detect Android Gradle Plugin version",
+                suggestion = "Declare AGP version in libs.versions.toml or root build.gradle.kts"
+            ))
+            else -> result.add(Diagnostic(
+                level = DiagnosticLevel.OK,
+                message = "AGP: ${info.agpVersion}"
+            ))
+        }
+
         return result
     }
 
@@ -157,6 +170,26 @@ class ToolchainDetector {
         // e.g. https\://services.gradle.org/distributions/gradle-8.11-bin.zip
         return Regex("gradle-(\\d+(?:\\.\\d+)+)-")
             .find(distributionUrl)
+            ?.groupValues?.get(1)
+    }
+
+    internal fun readAgpVersion(projectDir: File): String? {
+        // 1. libs.versions.toml — agp = "X.Y.Z"
+        val toml = File(projectDir, "gradle/libs.versions.toml")
+        if (toml.exists()) {
+            val match = Regex("""agp\s*=\s*"([\d.]+)"""").find(toml.readText())
+            if (match != null) return match.groupValues[1]
+        }
+
+        // 2. build.gradle.kts — id("com.android.application") version "X.Y.Z"
+        //                       id("com.android.library") version "X.Y.Z"
+        val buildFile = listOf(
+            File(projectDir, "build.gradle.kts"),
+            File(projectDir, "build.gradle")
+        ).firstOrNull { it.exists() } ?: return null
+
+        return Regex("""com\.android\.\w+["']\s*\)?\s*version\s*["']([\d.]+)""")
+            .find(buildFile.readText())
             ?.groupValues?.get(1)
     }
 }
