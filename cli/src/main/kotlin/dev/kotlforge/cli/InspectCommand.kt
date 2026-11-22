@@ -4,18 +4,25 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.choice
 import dev.kotlforge.core.ConfigLoader
 import dev.kotlforge.core.ProjectRootFinder
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readLines
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 class InspectCommand : CliktCommand(
     name = "inspect",
     help = "Show project information without building"
 ) {
     private val projectPath by option("--project", "-p", help = "Path to the Android project").default(".")
+    private val format by option("--format", "-f", help = "Output format: text or json")
+        .choice("text", "json").default("text")
+
+    private val json = Json { prettyPrint = true }
 
     override fun run() {
         val startDir = Path.of(projectPath).toAbsolutePath().normalize()
@@ -30,19 +37,31 @@ class InspectCommand : CliktCommand(
         val config  = ConfigLoader.load(root)
         val name    = readProjectName(root)
         val gradleVersion = readGradleVersion(root)
+        val configPresent = root.resolve("kotlforge.json").exists()
 
-        echo("KotlForge Inspect: $root")
-        echo("")
+        if (format == "json") {
+            val report = ProjectInfo(
+                projectRoot = root.toString(),
+                projectName = name,
+                gradleWrapperPresent = gradlew.exists(),
+                gradleVersion = gradleVersion,
+                configFilePresent = configPresent,
+                defaultVariant = config.defaultVariant,
+                defaultTasks = config.defaultTasks
+            )
+            echo(json.encodeToString(ProjectInfo.serializer(), report))
+            return
+        }
+
         val wrapperStatus = if (gradlew.exists()) {
             "found${if (gradleVersion != null) " (Gradle $gradleVersion)" else ""}"
         } else {
             "MISSING — run `gradle wrapper` to create it"
         }
-        val configStatus = if (root.resolve("kotlforge.json").exists()) {
-            "kotlforge.json (found)"
-        } else {
-            "(none — using defaults)"
-        }
+        val configStatus = if (configPresent) "kotlforge.json (found)" else "(none — using defaults)"
+
+        echo("KotlForge Inspect: $root")
+        echo("")
         echo("  Project root:    $root")
         echo("  Project name:    ${name ?: "(unknown)"}")
         echo("  Gradle wrapper:  $wrapperStatus")
@@ -61,7 +80,6 @@ class InspectCommand : CliktCommand(
             if (!path.isRegularFile()) continue
             path.readLines().forEach { line ->
                 val trimmed = line.trim()
-                // rootProject.name = "foo" or rootProject.name("foo")
                 val eqMatch = Regex("""rootProject\.name\s*=\s*["']([^"']+)["']""").find(trimmed)
                 if (eqMatch != null) return eqMatch.groupValues[1]
                 val fnMatch = Regex("""rootProject\.name\(["']([^"']+)["']\)""").find(trimmed)
@@ -81,3 +99,14 @@ class InspectCommand : CliktCommand(
         return null
     }
 }
+
+@Serializable
+data class ProjectInfo(
+    val projectRoot: String,
+    val projectName: String?,
+    val gradleWrapperPresent: Boolean,
+    val gradleVersion: String?,
+    val configFilePresent: Boolean,
+    val defaultVariant: String,
+    val defaultTasks: List<String>
+)
