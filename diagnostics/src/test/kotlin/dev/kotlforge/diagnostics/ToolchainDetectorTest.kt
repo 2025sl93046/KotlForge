@@ -4,6 +4,7 @@ import dev.kotlforge.core.DiagnosticLevel
 import dev.kotlforge.core.ToolchainInfo
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.io.File
 import java.nio.file.Files
 
 class ToolchainDetectorTest {
@@ -126,10 +127,77 @@ class ToolchainDetectorTest {
         try {
             val info = ToolchainInfo(androidSdkPath = tempDir.absolutePath)
             val diagnostics = detector.checks(info)
-            val sdkDiag = diagnostics.first { it.message.contains("Android SDK") }
+            val sdkDiag = diagnostics.first { it.message.contains("Android SDK:") && !it.message.contains("platform") && !it.message.contains("build-tools") }
             assertEquals(DiagnosticLevel.OK, sdkDiag.level)
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+
+    // ── checkSdkPackages() ───────────────────────────────────────────────────
+
+    @Test
+    fun `checkSdkPackages returns ERROR when platforms directory is empty`() {
+        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
+        try {
+            File(tempDir, "platforms").mkdirs()
+            File(tempDir, "build-tools").mkdirs()
+            val diagnostics = detector.checkSdkPackages(tempDir.absolutePath)
+            val diag = diagnostics.first { it.message.contains("platform") }
+            assertEquals(DiagnosticLevel.ERROR, diag.level)
+            assertNotNull(diag.suggestion)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `checkSdkPackages returns OK when at least one platform is installed`() {
+        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
+        try {
+            File(tempDir, "platforms/android-35").mkdirs()
+            File(tempDir, "build-tools/35.0.0").mkdirs()
+            val diagnostics = detector.checkSdkPackages(tempDir.absolutePath)
+            val diag = diagnostics.first { it.message.contains("platforms") }
+            assertEquals(DiagnosticLevel.OK, diag.level)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `checkSdkPackages returns ERROR when build-tools directory is empty`() {
+        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
+        try {
+            File(tempDir, "platforms/android-35").mkdirs()
+            File(tempDir, "build-tools").mkdirs()
+            val diagnostics = detector.checkSdkPackages(tempDir.absolutePath)
+            val diag = diagnostics.first { it.message.contains("build-tools") }
+            assertEquals(DiagnosticLevel.ERROR, diag.level)
+            assertNotNull(diag.suggestion)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `checkSdkPackages returns OK when at least one build-tools version is installed`() {
+        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
+        try {
+            File(tempDir, "platforms/android-35").mkdirs()
+            File(tempDir, "build-tools/35.0.0").mkdirs()
+            val diagnostics = detector.checkSdkPackages(tempDir.absolutePath)
+            val diag = diagnostics.first { it.message.contains("build-tools") }
+            assertEquals(DiagnosticLevel.OK, diag.level)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `checks does not run package checks when androidSdkPath is null`() {
+        val info = ToolchainInfo(androidSdkPath = null)
+        val diagnostics = detector.checks(info)
+        assertFalse(diagnostics.any { it.message.contains("platforms") || it.message.contains("build-tools") })
     }
 }
