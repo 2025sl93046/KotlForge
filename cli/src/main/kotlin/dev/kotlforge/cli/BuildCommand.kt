@@ -5,9 +5,13 @@ import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
+import dev.kotlforge.core.BuildReport
 import dev.kotlforge.core.BuildRequest
 import dev.kotlforge.core.BuildResult
 import dev.kotlforge.engine.GradleRunner
+import java.nio.file.Path
+import java.time.Instant
+import kotlin.io.path.writeText
 import kotlinx.serialization.json.Json
 
 class BuildCommand : CliktCommand(
@@ -23,7 +27,10 @@ class BuildCommand : CliktCommand(
     override fun run() {
         if (format == "text") echo("Building $variant variant at: $projectPath")
 
+        val absRoot = Path.of(projectPath).toAbsolutePath().normalize()
         val result = GradleRunner().build(BuildRequest(projectDir = projectPath, variant = variant))
+
+        writeReport(absRoot, result)
 
         when (format) {
             "json" -> echo(json.encodeToString(BuildResult.serializer(), result))
@@ -31,6 +38,21 @@ class BuildCommand : CliktCommand(
         }
 
         if (!result.success) throw ProgramResult(ExitCode.BUILD_FAILED)
+    }
+
+    private fun writeReport(projectRoot: Path, result: BuildResult) {
+        val report = BuildReport(
+            timestamp      = Instant.now().toString(),
+            projectRoot    = projectRoot.toString(),
+            variant        = variant,
+            success        = result.success,
+            durationMillis = result.durationMillis,
+            artifacts      = result.artifacts,
+            diagnostics    = result.diagnostics
+        )
+        val reportFile = projectRoot.resolve("kotlforge-report.json")
+        reportFile.writeText(json.encodeToString(BuildReport.serializer(), report))
+        if (format == "text") echo("Report written: $reportFile")
     }
 
     private fun renderText(result: BuildResult) {
