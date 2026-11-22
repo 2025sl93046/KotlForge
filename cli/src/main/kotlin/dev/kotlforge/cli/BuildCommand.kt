@@ -9,6 +9,7 @@ import dev.kotlforge.core.BuildReport
 import dev.kotlforge.core.BuildRequest
 import dev.kotlforge.core.BuildResult
 import dev.kotlforge.engine.GradleRunner
+import java.io.IOException
 import java.nio.file.Path
 import java.time.Instant
 import kotlin.io.path.writeText
@@ -51,8 +52,12 @@ class BuildCommand : CliktCommand(
             diagnostics    = result.diagnostics
         )
         val reportFile = projectRoot.resolve("kotlforge-report.json")
-        reportFile.writeText(json.encodeToString(BuildReport.serializer(), report))
-        if (format == "text") echo("Report written: $reportFile")
+        try {
+            reportFile.writeText(json.encodeToString(BuildReport.serializer(), report))
+            if (format == "text") echo("Report written: $reportFile")
+        } catch (e: IOException) {
+            if (format == "text") echo("Warning: could not write report — ${e.message}")
+        }
     }
 
     private fun renderText(result: BuildResult) {
