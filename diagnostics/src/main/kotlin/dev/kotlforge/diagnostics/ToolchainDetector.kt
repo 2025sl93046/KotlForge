@@ -18,11 +18,11 @@ class ToolchainDetector {
         )
     }
 
-    fun detect(): ToolchainInfo {
+    fun detect(projectDir: File? = null): ToolchainInfo {
         return ToolchainInfo(
             jdkPath = System.getenv("JAVA_HOME"),
             androidSdkPath = resolveAndroidSdkPath(),
-            gradleVersion = null
+            gradleVersion = projectDir?.let { readGradleWrapperVersion(it) }
         )
     }
 
@@ -81,6 +81,18 @@ class ToolchainDetector {
             }
         }
 
+        when (info.gradleVersion) {
+            null -> result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Gradle wrapper: NOT FOUND — no gradle-wrapper.properties in project",
+                suggestion = "Run: gradle wrapper --gradle-version 8.11"
+            ))
+            else -> result.add(Diagnostic(
+                level = DiagnosticLevel.OK,
+                message = "Gradle wrapper: ${info.gradleVersion}"
+            ))
+        }
+
         return result
     }
 
@@ -134,5 +146,17 @@ class ToolchainDetector {
         }
 
         return result
+    }
+
+    internal fun readGradleWrapperVersion(projectDir: File): String? {
+        val props = File(projectDir, "gradle/wrapper/gradle-wrapper.properties")
+        if (!props.exists()) return null
+        val distributionUrl = props.readLines()
+            .firstOrNull { it.startsWith("distributionUrl=") }
+            ?: return null
+        // e.g. https\://services.gradle.org/distributions/gradle-8.11-bin.zip
+        return Regex("gradle-(\\d+(?:\\.\\d+)+)-")
+            .find(distributionUrl)
+            ?.groupValues?.get(1)
     }
 }
