@@ -328,4 +328,54 @@ class ToolchainDetectorTest {
         val diag = diagnostics.first { it.message.contains("AGP") }
         assertEquals(DiagnosticLevel.OK, diag.level)
     }
+
+    // ── runChecks() ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `runChecks returns non-empty list without projectDir`() {
+        val diagnostics = detector.runChecks()
+        assertTrue(diagnostics.isNotEmpty())
+    }
+
+    @Test
+    fun `runChecks includes Gradle wrapper check when projectDir has wrapper`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "gradle/wrapper").mkdirs()
+            File(tempDir, "gradle/wrapper/gradle-wrapper.properties").writeText(
+                "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11-bin.zip"
+            )
+            val diagnostics = detector.runChecks(tempDir)
+            val diag = diagnostics.first { it.message.contains("Gradle wrapper") }
+            assertEquals(DiagnosticLevel.OK, diag.level)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `runChecks includes AGP check when projectDir has toml`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "gradle").mkdirs()
+            File(tempDir, "gradle/libs.versions.toml").writeText("""agp = "8.2.0"""")
+            val diagnostics = detector.runChecks(tempDir)
+            val diag = diagnostics.first { it.message.contains("AGP") }
+            assertEquals(DiagnosticLevel.OK, diag.level)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `runChecks emits WARNING for Gradle and AGP when projectDir has no build files`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            val diagnostics = detector.runChecks(tempDir)
+            assertEquals(DiagnosticLevel.WARNING, diagnostics.first { it.message.contains("Gradle wrapper") }.level)
+            assertEquals(DiagnosticLevel.WARNING, diagnostics.first { it.message.contains("AGP") }.level)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }

@@ -27,6 +27,11 @@ class ToolchainDetector {
         )
     }
 
+    /** Single entry point: detect environment then return all structured checks. */
+    fun runChecks(projectDir: File? = null): List<Diagnostic> {
+        return checks(detect(projectDir))
+    }
+
     internal fun resolveAndroidSdkPath(): String? {
         // 1. Explicit env vars take priority
         val fromEnv = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
