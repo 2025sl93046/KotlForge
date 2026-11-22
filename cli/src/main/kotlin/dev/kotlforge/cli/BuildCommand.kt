@@ -72,4 +72,4 @@ class BuildCommand : CliktCommand(
             if (error?.suggestion != null) echo("Suggestion: ${error.suggestion}")
         }
     }
-}
+} 
