@@ -253,4 +253,79 @@ class ToolchainDetectorTest {
         val diag = diagnostics.first { it.message.contains("Gradle wrapper") }
         assertEquals(DiagnosticLevel.OK, diag.level)
     }
+
+    // ── readAgpVersion() ─────────────────────────────────────────────────────
+
+    @Test
+    fun `readAgpVersion reads version from libs_versions_toml`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "gradle").mkdirs()
+            File(tempDir, "gradle/libs.versions.toml").writeText("""
+                [versions]
+                agp = "8.2.0"
+                kotlin = "1.9.0"
+            """.trimIndent())
+            assertEquals("8.2.0", detector.readAgpVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `readAgpVersion reads version from root build_gradle_kts`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "build.gradle.kts").writeText("""
+                plugins {
+                    id("com.android.application") version "8.1.0" apply false
+                }
+            """.trimIndent())
+            assertEquals("8.1.0", detector.readAgpVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `readAgpVersion returns null when no build files exist`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            assertNull(detector.readAgpVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `readAgpVersion prefers toml over build_gradle_kts`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "gradle").mkdirs()
+            File(tempDir, "gradle/libs.versions.toml").writeText("""agp = "8.2.0"""")
+            File(tempDir, "build.gradle.kts").writeText("""id("com.android.application") version "8.1.0"""")
+            assertEquals("8.2.0", detector.readAgpVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    // ── checks() — AGP ───────────────────────────────────────────────────────
+
+    @Test
+    fun `checks returns WARNING when agpVersion is null`() {
+        val info = ToolchainInfo(agpVersion = null)
+        val diagnostics = detector.checks(info)
+        val diag = diagnostics.first { it.message.contains("AGP") }
+        assertEquals(DiagnosticLevel.WARNING, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `checks returns OK when agpVersion is set`() {
+        val info = ToolchainInfo(agpVersion = "8.2.0")
+        val diagnostics = detector.checks(info)
+        val diag = diagnostics.first { it.message.contains("AGP") }
+        assertEquals(DiagnosticLevel.OK, diag.level)
+    }
 }
