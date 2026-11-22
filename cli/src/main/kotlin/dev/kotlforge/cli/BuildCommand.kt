@@ -5,8 +5,10 @@ import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
+import dev.kotlforge.core.ArtifactValidator
 import dev.kotlforge.core.BuildRequest
 import dev.kotlforge.core.BuildResult
+import dev.kotlforge.core.DiagnosticLevel
 import dev.kotlforge.engine.GradleRunner
 import kotlinx.serialization.json.Json
 
@@ -25,12 +27,28 @@ class BuildCommand : CliktCommand(
 
         val result = GradleRunner().build(BuildRequest(projectDir = projectPath, variant = variant))
 
+        if (result.success) validateArtifacts(result)
+
         when (format) {
             "json" -> echo(json.encodeToString(BuildResult.serializer(), result))
             else   -> renderText(result)
         }
 
         if (!result.success) throw ProgramResult(ExitCode.BUILD_FAILED)
+    }
+
+    private fun validateArtifacts(result: BuildResult) {
+        val validationErrors = result.artifacts
+            .flatMap { ArtifactValidator.validate(it) }
+            .filter { it.level == DiagnosticLevel.ERROR }
+
+        if (validationErrors.isNotEmpty()) {
+            validationErrors.forEach { d ->
+                echo("Artifact validation failed: ${d.message}", err = true)
+                if (d.suggestion != null) echo("  Suggestion: ${d.suggestion}", err = true)
+            }
+            throw ProgramResult(ExitCode.BUILD_FAILED)
+        }
     }
 
     private fun renderText(result: BuildResult) {

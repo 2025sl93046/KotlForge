@@ -7,7 +7,13 @@ import kotlin.io.path.inputStream
 
 object ArtifactValidator {
 
-    private val APK_MAGIC = byteArrayOf(0x50, 0x4B, 0x03, 0x04)
+    private const val MAGIC_HEADER_SIZE = 4
+    private const val BYTES_PER_KB = 1024L
+    private const val ZIP_MAGIC_BYTE_0 = 0x50.toByte()
+    private const val ZIP_MAGIC_BYTE_1 = 0x4B.toByte()
+    private const val ZIP_MAGIC_BYTE_2 = 0x03.toByte()
+    private const val ZIP_MAGIC_BYTE_3 = 0x04.toByte()
+    private val APK_MAGIC = byteArrayOf(ZIP_MAGIC_BYTE_0, ZIP_MAGIC_BYTE_1, ZIP_MAGIC_BYTE_2, ZIP_MAGIC_BYTE_3)
 
     fun validate(artifact: BuildArtifact): List<Diagnostic> {
         val path = Path.of(artifact.path)
@@ -42,7 +48,7 @@ object ArtifactValidator {
         if (diagnostics.isEmpty()) {
             diagnostics += Diagnostic(
                 level   = DiagnosticLevel.OK,
-                message = "Artifact OK: ${artifact.path} (${actualSize / 1024}KB)"
+                message = "Artifact OK: ${artifact.path} (${actualSize / BYTES_PER_KB}KB)"
             )
         }
 
@@ -51,7 +57,7 @@ object ArtifactValidator {
 
     private fun hasZipMagic(path: Path): Boolean {
         return try {
-            val header = ByteArray(4)
+            val header = ByteArray(MAGIC_HEADER_SIZE)
             path.inputStream().use { it.read(header) }
             header.contentEquals(APK_MAGIC)
         } catch (_: Exception) {
