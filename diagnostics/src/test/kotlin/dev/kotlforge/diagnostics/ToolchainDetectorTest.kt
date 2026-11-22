@@ -378,4 +378,49 @@ class ToolchainDetectorTest {
             tempDir.deleteRecursively()
         }
     }
+
+    // ── sanitize() — BLI 2.7 no credentials ──────────────────────────────────
+
+    @Test
+    fun `sanitize redacts KEY=VALUE pairs with long values`() {
+        val result = detector.sanitize("SOME_TOKEN=abc123xyzABCDEF12")
+        assertTrue(result.contains("[REDACTED]"), "Expected redaction but got: $result")
+        assertFalse(result.contains("abc123xyzABCDEF12"))
+    }
+
+    @Test
+    fun `sanitize leaves normal file paths intact`() {
+        val path = "/usr/lib/jvm/java-17"
+        assertEquals(path, detector.sanitize(path))
+    }
+
+    @Test
+    fun `sanitize leaves short values intact`() {
+        assertEquals("KEY=short", detector.sanitize("KEY=short"))
+    }
+
+    @Test
+    fun `checks messages do not contain raw env var assignments`() {
+        val info = ToolchainInfo(jdkPath = null, androidSdkPath = null)
+        val diagnostics = detector.checks(info)
+        for (d in diagnostics) {
+            assertFalse(d.message.contains("="), "Raw env var assignment found in: ${d.message}")
+        }
+    }
+
+    @Test
+    fun `checks messages do not expose token-like strings from paths`() {
+        val tempDir = Files.createTempDirectory("fake-jdk").toFile()
+        try {
+            // Simulate a path that contains a long token-like segment
+            val suspiciousPath = "${tempDir.absolutePath}/ghp_abcdefghijklmnopqrstuvwxyz123456"
+            val info = ToolchainInfo(jdkPath = suspiciousPath)
+            val diagnostics = detector.checks(info)
+            val jdkMsg = diagnostics.first { it.message.contains("JDK") }.message
+            assertFalse(jdkMsg.contains("ghp_abcdefghijklmnopqrstuvwxyz123456"),
+                "Token leaked in message: $jdkMsg")
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }

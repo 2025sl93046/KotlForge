@@ -32,6 +32,17 @@ class ToolchainDetector {
         return checks(detect(projectDir))
     }
 
+    /**
+     * Redacts values that look like credentials from a diagnostic message.
+     * Specifically strips:
+     *  - KEY=VALUE pairs where VALUE is 8+ chars (env var leaks)
+     *  - Standalone tokens: 20+ char alphanumeric strings
+     */
+    internal fun sanitize(text: String): String =
+        text
+            .replace(Regex("""(\w+=)[A-Za-z0-9+/]{8,}={0,2}"""), "$1[REDACTED]")
+            .replace(Regex("""(?<![/\\.A-Za-z0-9])[A-Za-z0-9+/]{20,}(?![/\\.A-Za-z0-9])"""), "[REDACTED]")
+
     internal fun resolveAndroidSdkPath(): String? {
         // 1. Explicit env vars take priority
         val fromEnv = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
@@ -51,16 +62,16 @@ class ToolchainDetector {
                     message = "JDK: NOT FOUND — JAVA_HOME is not set",
                     suggestion = "Run: export JAVA_HOME=\$(/usr/libexec/java_home -v 17)"
                 ))
-            !File(info.jdkPath).exists() ->
+            !File(info.jdkPath!!).exists() ->
                 result.add(Diagnostic(
                     level = DiagnosticLevel.ERROR,
-                    message = "JDK: path does not exist — ${info.jdkPath}",
+                    message = "JDK: path does not exist — ${sanitize(info.jdkPath!!)}",
                     suggestion = "Check JAVA_HOME points to a valid JDK installation"
                 ))
             else ->
                 result.add(Diagnostic(
                     level = DiagnosticLevel.OK,
-                    message = "JDK: ${info.jdkPath}"
+                    message = "JDK: ${sanitize(info.jdkPath!!)}"
                 ))
         }
 
@@ -71,17 +82,17 @@ class ToolchainDetector {
                     message = "Android SDK: NOT FOUND — ANDROID_HOME is not set",
                     suggestion = "Run: export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools"
                 ))
-            !File(info.androidSdkPath).exists() ->
+            !File(info.androidSdkPath!!).exists() ->
                 result.add(Diagnostic(
                     level = DiagnosticLevel.ERROR,
-                    message = "Android SDK: path does not exist — ${info.androidSdkPath}",
+                    message = "Android SDK: path does not exist — ${sanitize(info.androidSdkPath!!)}",
                     suggestion = "Check ANDROID_HOME points to a valid Android SDK installation"
                 ))
             else -> {
                 val sdkPath = info.androidSdkPath!!
                 result.add(Diagnostic(
                     level = DiagnosticLevel.OK,
-                    message = "Android SDK: $sdkPath"
+                    message = "Android SDK: ${sanitize(sdkPath)}"
                 ))
                 result.addAll(checkSdkPackages(sdkPath))
             }
