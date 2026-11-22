@@ -200,4 +200,63 @@ class ToolchainDetectorTest {
         val diagnostics = detector.checks(info)
         assertFalse(diagnostics.any { it.message.contains("platforms") || it.message.contains("build-tools") })
     }
+
+    // ── readGradleWrapperVersion() ────────────────────────────────────────────
+
+    @Test
+    fun `readGradleWrapperVersion returns version from valid wrapper properties`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "gradle/wrapper").mkdirs()
+            File(tempDir, "gradle/wrapper/gradle-wrapper.properties").writeText(
+                "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11-bin.zip"
+            )
+            assertEquals("8.11", detector.readGradleWrapperVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `readGradleWrapperVersion returns null when wrapper properties file is missing`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            assertNull(detector.readGradleWrapperVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `readGradleWrapperVersion handles three-part version numbers`() {
+        val tempDir = Files.createTempDirectory("fake-project").toFile()
+        try {
+            File(tempDir, "gradle/wrapper").mkdirs()
+            File(tempDir, "gradle/wrapper/gradle-wrapper.properties").writeText(
+                "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
+            )
+            assertEquals("8.11.1", detector.readGradleWrapperVersion(tempDir))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    // ── checks() — Gradle wrapper ─────────────────────────────────────────────
+
+    @Test
+    fun `checks returns WARNING when gradleVersion is null`() {
+        val info = ToolchainInfo(gradleVersion = null)
+        val diagnostics = detector.checks(info)
+        val diag = diagnostics.first { it.message.contains("Gradle wrapper") }
+        assertEquals(DiagnosticLevel.WARNING, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `checks returns OK when gradleVersion is set`() {
+        val info = ToolchainInfo(gradleVersion = "8.11")
+        val diagnostics = detector.checks(info)
+        val diag = diagnostics.first { it.message.contains("Gradle wrapper") }
+        assertEquals(DiagnosticLevel.OK, diag.level)
+    }
 }
