@@ -14,9 +14,15 @@ class ToolchainDetectorTest {
     // ── detect() ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `detect returns a ToolchainInfo with jdkPath from JAVA_HOME`() {
-        val info = detector.detect()
-        assertEquals(System.getenv("JAVA_HOME"), info.jdkPath)
+    fun `detect returns jdkPath from injected env`() {
+        val d = ToolchainDetector(env = { name -> mapOf("JAVA_HOME" to "/injected/jdk")[name] })
+        assertEquals("/injected/jdk", d.detect().jdkPath)
+    }
+
+    @Test
+    fun `detect returns null jdkPath when JAVA_HOME not set`() {
+        val d = ToolchainDetector(env = { _ -> null })
+        assertNull(d.detect().jdkPath)
     }
 
     // ── checks() — JDK ───────────────────────────────────────────────────────
@@ -55,44 +61,44 @@ class ToolchainDetectorTest {
     // ── resolveAndroidSdkPath() ───────────────────────────────────────────────
 
     @Test
-    fun `detect picks up androidSdkPath from ANDROID_HOME env var`() {
-        val info = detector.detect()
-        val expected = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
-        if (expected != null) {
-            assertEquals(expected, info.androidSdkPath)
-        }
+    fun `resolveAndroidSdkPath returns injected ANDROID_HOME`() {
+        val d = ToolchainDetector(env = { name -> mapOf("ANDROID_HOME" to "/injected/sdk")[name] })
+        assertEquals("/injected/sdk", d.resolveAndroidSdkPath())
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath returns injected ANDROID_SDK_ROOT when ANDROID_HOME absent`() {
+        val d = ToolchainDetector(env = { name ->
+            mapOf("ANDROID_SDK_ROOT" to "/injected/sdk-root")[name]
+        })
+        assertEquals("/injected/sdk-root", d.resolveAndroidSdkPath())
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath prefers ANDROID_HOME over ANDROID_SDK_ROOT`() {
+        val d = ToolchainDetector(env = { name ->
+            mapOf("ANDROID_HOME" to "/home-sdk", "ANDROID_SDK_ROOT" to "/root-sdk")[name]
+        })
+        assertEquals("/home-sdk", d.resolveAndroidSdkPath())
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath falls back to first existing standard path when no env var`() {
+        // When isDirectory always returns true, the first STANDARD_SDK_PATH is returned.
+        val d = ToolchainDetector(
+            env = { _ -> null },
+            isDirectory = { _ -> true }
+        )
+        assertNotNull(d.resolveAndroidSdkPath())
     }
 
     @Test
     fun `resolveAndroidSdkPath returns null when no env var and no standard path exists`() {
-        val result = ToolchainDetector.STANDARD_SDK_PATHS
-            .filter { java.io.File(it).isDirectory }
-        val resolved = detector.resolveAndroidSdkPath()
-        if (result.isEmpty() && System.getenv("ANDROID_HOME") == null && System.getenv("ANDROID_SDK_ROOT") == null) {
-            assertNull(resolved)
-        } else {
-            assertNotNull(resolved)
-        }
-    }
-
-    @Test
-    fun `resolveAndroidSdkPath prefers ANDROID_HOME over standard paths`() {
-        val androidHome = System.getenv("ANDROID_HOME")
-        if (androidHome != null) {
-            assertEquals(androidHome, detector.resolveAndroidSdkPath())
-        }
-    }
-
-    @Test
-    fun `resolveAndroidSdkPath falls back to first existing standard path`() {
-        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
-        try {
-            val paths = listOf("/nonexistent/path1", tempDir.absolutePath, "/nonexistent/path2")
-            val result = paths.firstOrNull { java.io.File(it).isDirectory }
-            assertEquals(tempDir.absolutePath, result)
-        } finally {
-            tempDir.deleteRecursively()
-        }
+        val d = ToolchainDetector(
+            env = { _ -> null },
+            isDirectory = { _ -> false }
+        )
+        assertNull(d.resolveAndroidSdkPath())
     }
 
     // ── checks() — Android SDK ───────────────────────────────────────────────
@@ -377,6 +383,31 @@ class ToolchainDetectorTest {
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+
+    // ── detect() with injected env — full fixture ─────────────────────────────
+
+    @Test
+    fun `detect uses injected env for both JAVA_HOME and ANDROID_HOME`() {
+        val fakeEnv = mapOf(
+            "JAVA_HOME" to "/fake/jdk",
+            "ANDROID_HOME" to "/fake/sdk"
+        )
+        val d = ToolchainDetector(env = { name -> fakeEnv[name] })
+        val info = d.detect()
+        assertEquals("/fake/jdk", info.jdkPath)
+        assertEquals("/fake/sdk", info.androidSdkPath)
+    }
+
+    @Test
+    fun `detect returns null paths when env is empty`() {
+        val d = ToolchainDetector(
+            env = { _ -> null },
+            isDirectory = { _ -> false }
+        )
+        val info = d.detect()
+        assertNull(info.jdkPath)
+        assertNull(info.androidSdkPath)
     }
 
     // ── sanitize() — BLI 2.7 no credentials ──────────────────────────────────

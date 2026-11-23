@@ -5,7 +5,10 @@ import dev.kotlforge.core.DiagnosticLevel
 import dev.kotlforge.core.ToolchainInfo
 import java.io.File
 
-class ToolchainDetector {
+class ToolchainDetector(
+    private val env: (String) -> String? = System::getenv,
+    private val isDirectory: (String) -> Boolean = { File(it).isDirectory }
+) {
 
     companion object {
         /** Standard SDK locations tried when no env var is set, in priority order. */
@@ -20,7 +23,7 @@ class ToolchainDetector {
 
     fun detect(projectDir: File? = null): ToolchainInfo {
         return ToolchainInfo(
-            jdkPath = System.getenv("JAVA_HOME"),
+            jdkPath = env("JAVA_HOME"),
             androidSdkPath = resolveAndroidSdkPath(),
             gradleVersion = projectDir?.let { readGradleWrapperVersion(it) },
             agpVersion = projectDir?.let { readAgpVersion(it) }
@@ -45,11 +48,11 @@ class ToolchainDetector {
 
     internal fun resolveAndroidSdkPath(): String? {
         // 1. Explicit env vars take priority
-        val fromEnv = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+        val fromEnv = env("ANDROID_HOME") ?: env("ANDROID_SDK_ROOT")
         if (fromEnv != null) return fromEnv
 
         // 2. Fall back to standard platform paths
-        return STANDARD_SDK_PATHS.firstOrNull { File(it).isDirectory }
+        return STANDARD_SDK_PATHS.firstOrNull { isDirectory(it) }
     }
 
     fun checks(info: ToolchainInfo): List<Diagnostic> {
