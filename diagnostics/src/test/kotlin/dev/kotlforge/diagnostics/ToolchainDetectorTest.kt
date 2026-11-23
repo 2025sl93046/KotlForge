@@ -101,6 +101,67 @@ class ToolchainDetectorTest {
         assertNull(d.resolveAndroidSdkPath())
     }
 
+    // ── BLI 2.11: Windows SDK path discovery ─────────────────────────────────
+
+    @Test
+    fun `expandWindowsTemplate expands LOCALAPPDATA token`() {
+        val d = ToolchainDetector(env = { name -> if (name == "LOCALAPPDATA") "C:\\Users\\Dev\\AppData\\Local" else null })
+        assertEquals(
+            "C:\\Users\\Dev\\AppData\\Local\\Android\\Sdk",
+            d.expandWindowsTemplate("%LOCALAPPDATA%\\Android\\Sdk")
+        )
+    }
+
+    @Test
+    fun `expandWindowsTemplate expands USERPROFILE token`() {
+        val d = ToolchainDetector(env = { name -> if (name == "USERPROFILE") "C:\\Users\\Dev" else null })
+        assertEquals(
+            "C:\\Users\\Dev\\Android\\Sdk",
+            d.expandWindowsTemplate("%USERPROFILE%\\Android\\Sdk")
+        )
+    }
+
+    @Test
+    fun `expandWindowsTemplate returns null when env var is not set`() {
+        val d = ToolchainDetector(env = { _ -> null })
+        assertNull(d.expandWindowsTemplate("%LOCALAPPDATA%\\Android\\Sdk"))
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath finds SDK via LOCALAPPDATA when no explicit env var`() {
+        val fakeLocal = "C:\\Users\\Dev\\AppData\\Local"
+        val expectedPath = "$fakeLocal\\Android\\Sdk"
+        val d = ToolchainDetector(
+            env = { name -> if (name == "LOCALAPPDATA") fakeLocal else null },
+            isDirectory = { path -> path == expectedPath }
+        )
+        assertEquals(expectedPath, d.resolveAndroidSdkPath())
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath finds SDK via USERPROFILE when LOCALAPPDATA path absent`() {
+        val fakeProfile = "C:\\Users\\Dev"
+        val expectedPath = "$fakeProfile\\Android\\Sdk"
+        val d = ToolchainDetector(
+            env = { name -> if (name == "USERPROFILE") fakeProfile else null },
+            isDirectory = { path -> path == expectedPath }
+        )
+        assertEquals(expectedPath, d.resolveAndroidSdkPath())
+    }
+
+    @Test
+    fun `resolveAndroidSdkPath prefers ANDROID_HOME over Windows fallback paths`() {
+        val d = ToolchainDetector(
+            env = { name -> when (name) {
+                "ANDROID_HOME"  -> "D:\\CustomSdk"
+                "LOCALAPPDATA"  -> "C:\\Users\\Dev\\AppData\\Local"
+                else            -> null
+            }},
+            isDirectory = { _ -> true }
+        )
+        assertEquals("D:\\CustomSdk", d.resolveAndroidSdkPath())
+    }
+
     // ── checks() — Android SDK ───────────────────────────────────────────────
 
     @Test
