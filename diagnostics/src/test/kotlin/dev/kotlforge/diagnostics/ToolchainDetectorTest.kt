@@ -608,4 +608,69 @@ class ToolchainDetectorTest {
             tempDir.deleteRecursively()
         }
     }
+
+    // ── BLI 2.12: compatibility warnings ─────────────────────────────────────
+
+    @Test
+    fun `checkCompatibility returns empty list when no versions are set`() {
+        val info = ToolchainInfo()
+        assertTrue(detector.checkCompatibility(info).isEmpty())
+    }
+
+    @Test
+    fun `checkCompatibility returns WARNING for JDK 25 with Gradle 8`() {
+        val info = ToolchainInfo(jdkVersion = "25", gradleVersion = "8.11")
+        val diag = detector.checkCompatibility(info).first { it.message.contains("JDK") }
+        assertEquals(DiagnosticLevel.WARNING, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `checkCompatibility returns no warning for JDK 21 with Gradle 8`() {
+        val info = ToolchainInfo(jdkVersion = "21", gradleVersion = "8.11")
+        assertFalse(detector.checkCompatibility(info).any { it.message.contains("JDK") && it.message.contains("Gradle") })
+    }
+
+    @Test
+    fun `checkCompatibility returns WARNING for AGP 8 with Gradle 7`() {
+        val info = ToolchainInfo(agpVersion = "8.1.0", gradleVersion = "7.6")
+        val diag = detector.checkCompatibility(info).first { it.message.contains("AGP") }
+        assertEquals(DiagnosticLevel.WARNING, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `checkCompatibility returns no warning for AGP 8 with Gradle 8`() {
+        val info = ToolchainInfo(agpVersion = "8.1.0", gradleVersion = "8.11")
+        assertFalse(detector.checkCompatibility(info).any { it.message.contains("AGP") })
+    }
+
+    @Test
+    fun `checkCompatibility returns WARNING for AGP 7 with Gradle 6`() {
+        val info = ToolchainInfo(agpVersion = "7.4.0", gradleVersion = "6.9")
+        val diag = detector.checkCompatibility(info).first { it.message.contains("AGP") }
+        assertEquals(DiagnosticLevel.WARNING, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `checkCompatibility returns WARNING for AGP 8_2 with JDK 11`() {
+        val info = ToolchainInfo(agpVersion = "8.2.0", jdkVersion = "11")
+        val diag = detector.checkCompatibility(info).first { it.message.contains("JDK 17") }
+        assertEquals(DiagnosticLevel.WARNING, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `checkCompatibility returns no warning for AGP 8_2 with JDK 17`() {
+        val info = ToolchainInfo(agpVersion = "8.2.0", jdkVersion = "17")
+        assertFalse(detector.checkCompatibility(info).any { it.message.contains("JDK 17") })
+    }
+
+    @Test
+    fun `checks includes compatibility warnings in output`() {
+        val info = ToolchainInfo(jdkVersion = "25", gradleVersion = "8.11")
+        val diags = detector.checks(info)
+        assertTrue(diags.any { it.level == DiagnosticLevel.WARNING && it.message.contains("JDK") && it.message.contains("Gradle") })
+    }
 }

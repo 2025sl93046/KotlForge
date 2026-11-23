@@ -145,6 +145,8 @@ class ToolchainDetector(
             ))
         }
 
+        result.addAll(checkCompatibility(info))
+
         return result
     }
 
@@ -231,4 +233,63 @@ class ToolchainDetector(
             .find(buildFile.readText())
             ?.groupValues?.get(1)
     }
+
+    /**
+     * Emits WARNING diagnostics for known bad toolchain version combinations.
+     * Returns an empty list when versions are absent (can't evaluate) or compatible.
+     */
+    internal fun checkCompatibility(info: ToolchainInfo): List<Diagnostic> {
+        val result = mutableListOf<Diagnostic>()
+
+        val jdkMajor    = info.jdkVersion?.let { parseLeadingInt(it) }
+        val gradleMajor = info.gradleVersion?.let { parseLeadingInt(it) }
+        val agpMajor    = info.agpVersion?.let { parseLeadingInt(it) }
+        val agpMinor    = info.agpVersion?.let { parseMinorInt(it) }
+
+        // JDK 25+ is not supported by Gradle 8.x (breaks bytecode compatibility)
+        if (jdkMajor != null && jdkMajor >= 25 && gradleMajor != null && gradleMajor < 9) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: JDK ${info.jdkVersion} is not supported by Gradle ${info.gradleVersion}",
+                suggestion = "Use JDK 17 or 21, or upgrade to Gradle 9+"
+            ))
+        }
+
+        // AGP 8.x requires Gradle 8.0+
+        if (agpMajor != null && agpMajor >= 8 && gradleMajor != null && gradleMajor < 8) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: AGP ${info.agpVersion} requires Gradle 8.0+, found Gradle ${info.gradleVersion}",
+                suggestion = "Upgrade Gradle to 8.0 or higher"
+            ))
+        }
+
+        // AGP 7.x requires Gradle 7.0+
+        if (agpMajor != null && agpMajor == 7 && gradleMajor != null && gradleMajor < 7) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: AGP ${info.agpVersion} requires Gradle 7.0+, found Gradle ${info.gradleVersion}",
+                suggestion = "Upgrade Gradle to 7.0 or higher"
+            ))
+        }
+
+        // AGP 8.2+ requires JDK 17+
+        if (agpMajor != null && agpMinor != null &&
+            (agpMajor > 8 || (agpMajor == 8 && agpMinor >= 2)) &&
+            jdkMajor != null && jdkMajor < 17) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: AGP ${info.agpVersion} requires JDK 17+, found JDK ${info.jdkVersion}",
+                suggestion = "Set JAVA_HOME to a JDK 17 or 21 installation"
+            ))
+        }
+
+        return result
+    }
+
+    private fun parseLeadingInt(version: String): Int? =
+        version.split(".").firstOrNull()?.toIntOrNull()
+
+    private fun parseMinorInt(version: String): Int? =
+        version.split(".").getOrNull(1)?.toIntOrNull()
 }
