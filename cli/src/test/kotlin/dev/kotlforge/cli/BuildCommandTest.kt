@@ -1,0 +1,34 @@
+package dev.kotlforge.cli
+
+import com.github.ajalt.clikt.testing.test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class BuildCommandTest {
+
+    @Test
+    fun `invalid format value exits non-zero`() {
+        val result = BuildCommand().test("--format", "xml")
+
+        assertNotEquals(0, result.statusCode)
+    }
+
+    @Test
+    fun `unknown option exits non-zero`() {
+        val result = BuildCommand().test("--unknown-flag")
+
+        assertNotEquals(0, result.statusCode)
+    }
+
+    @Test
+    fun `help flag exits with 0`() {
+        val result = BuildCommand().test("--help")
+
+        assertEquals(0, result.statusCode)
+        assertTrue(result.output.contains("--project"))
+        assertTrue(result.output.contains("--variant"))
+        assertTrue(result.output.contains("--format"))
+    }
+}
