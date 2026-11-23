@@ -6,7 +6,7 @@ detekt            = "1.23.8"
 junit5            = "5.11.3"
 mockk             = "1.13.13"
 kotlin-logging    = "8.0.7"
-logback           = "1.5.12"
+logback           = "1.6.8"
 
 [libraries]
 clikt                 = { module = "com.github.ajalt.clikt:clikt",                     version.ref = "clikt" }
