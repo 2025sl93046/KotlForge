@@ -27,6 +27,14 @@ class ToolchainDetector(
             "%LOCALAPPDATA%\\Android\\Sdk",   // Android Studio default
             "%USERPROFILE%\\Android\\Sdk",    // fallback user profile
         )
+
+        // Version thresholds for compatibility checks
+        internal const val MIN_JDK_FOR_GRADLE9           = 25
+        internal const val MIN_GRADLE_FOR_JDK25          = 9
+        internal const val MIN_AGP_REQUIRING_GRADLE8     = 8
+        internal const val MIN_AGP_REQUIRING_GRADLE7     = 7
+        internal const val MIN_AGP_MINOR_REQUIRING_JDK17 = 2
+        internal const val MIN_JDK_FOR_AGP82             = 17
     }
 
     fun detect(projectDir: File? = null): ToolchainInfo {
@@ -247,7 +255,9 @@ class ToolchainDetector(
         val agpMinor    = info.agpVersion?.let { parseMinorInt(it) }
 
         // JDK 25+ is not supported by Gradle 8.x (breaks bytecode compatibility)
-        if (jdkMajor != null && jdkMajor >= 25 && gradleMajor != null && gradleMajor < 9) {
+        val jdkTooNew    = jdkMajor != null && jdkMajor >= MIN_JDK_FOR_GRADLE9
+        val gradleIsOld  = gradleMajor != null && gradleMajor < MIN_GRADLE_FOR_JDK25
+        if (jdkTooNew && gradleIsOld) {
             result.add(Diagnostic(
                 level = DiagnosticLevel.WARNING,
                 message = "Incompatible versions: JDK ${info.jdkVersion} is not supported by Gradle ${info.gradleVersion}",
@@ -256,7 +266,9 @@ class ToolchainDetector(
         }
 
         // AGP 8.x requires Gradle 8.0+
-        if (agpMajor != null && agpMajor >= 8 && gradleMajor != null && gradleMajor < 8) {
+        val agpIsV8       = agpMajor != null && agpMajor >= MIN_AGP_REQUIRING_GRADLE8
+        val gradleBefore8 = gradleMajor != null && gradleMajor < MIN_AGP_REQUIRING_GRADLE8
+        if (agpIsV8 && gradleBefore8) {
             result.add(Diagnostic(
                 level = DiagnosticLevel.WARNING,
                 message = "Incompatible versions: AGP ${info.agpVersion} requires Gradle 8.0+, found Gradle ${info.gradleVersion}",
@@ -265,7 +277,9 @@ class ToolchainDetector(
         }
 
         // AGP 7.x requires Gradle 7.0+
-        if (agpMajor != null && agpMajor == 7 && gradleMajor != null && gradleMajor < 7) {
+        val agpIsV7       = agpMajor != null && agpMajor == MIN_AGP_REQUIRING_GRADLE7
+        val gradleBefore7 = gradleMajor != null && gradleMajor < MIN_AGP_REQUIRING_GRADLE7
+        if (agpIsV7 && gradleBefore7) {
             result.add(Diagnostic(
                 level = DiagnosticLevel.WARNING,
                 message = "Incompatible versions: AGP ${info.agpVersion} requires Gradle 7.0+, found Gradle ${info.gradleVersion}",
@@ -274,9 +288,11 @@ class ToolchainDetector(
         }
 
         // AGP 8.2+ requires JDK 17+
-        if (agpMajor != null && agpMinor != null &&
-            (agpMajor > 8 || (agpMajor == 8 && agpMinor >= 2)) &&
-            jdkMajor != null && jdkMajor < 17) {
+        val agpAbove82   = agpMajor != null && agpMinor != null &&
+            (agpMajor > MIN_AGP_REQUIRING_GRADLE8 ||
+                (agpMajor == MIN_AGP_REQUIRING_GRADLE8 && agpMinor >= MIN_AGP_MINOR_REQUIRING_JDK17))
+        val jdkBefore17  = jdkMajor != null && jdkMajor < MIN_JDK_FOR_AGP82
+        if (agpAbove82 && jdkBefore17) {
             result.add(Diagnostic(
                 level = DiagnosticLevel.WARNING,
                 message = "Incompatible versions: AGP ${info.agpVersion} requires JDK 17+, found JDK ${info.jdkVersion}",
