@@ -27,6 +27,14 @@ class ToolchainDetector(
             "%LOCALAPPDATA%\\Android\\Sdk",   // Android Studio default
             "%USERPROFILE%\\Android\\Sdk",    // fallback user profile
         )
+
+        // Version thresholds for compatibility checks
+        internal const val MIN_JDK_FOR_GRADLE9           = 25
+        internal const val MIN_GRADLE_FOR_JDK25          = 9
+        internal const val MIN_AGP_REQUIRING_GRADLE8     = 8
+        internal const val MIN_AGP_REQUIRING_GRADLE7     = 7
+        internal const val MIN_AGP_MINOR_REQUIRING_JDK17 = 2
+        internal const val MIN_JDK_FOR_AGP82             = 17
     }
 
     fun detect(projectDir: File? = null): ToolchainInfo {
@@ -145,6 +153,8 @@ class ToolchainDetector(
             ))
         }
 
+        result.addAll(checkCompatibility(info))
+
         return result
     }
 
@@ -231,4 +241,71 @@ class ToolchainDetector(
             .find(buildFile.readText())
             ?.groupValues?.get(1)
     }
+
+    /**
+     * Emits WARNING diagnostics for known bad toolchain version combinations.
+     * Returns an empty list when versions are absent (can't evaluate) or compatible.
+     */
+    internal fun checkCompatibility(info: ToolchainInfo): List<Diagnostic> {
+        val result = mutableListOf<Diagnostic>()
+
+        val jdkMajor    = info.jdkVersion?.let { parseLeadingInt(it) }
+        val gradleMajor = info.gradleVersion?.let { parseLeadingInt(it) }
+        val agpMajor    = info.agpVersion?.let { parseLeadingInt(it) }
+        val agpMinor    = info.agpVersion?.let { parseMinorInt(it) }
+
+        // JDK 25+ is not supported by Gradle 8.x (breaks bytecode compatibility)
+        val jdkTooNew    = jdkMajor != null && jdkMajor >= MIN_JDK_FOR_GRADLE9
+        val gradleIsOld  = gradleMajor != null && gradleMajor < MIN_GRADLE_FOR_JDK25
+        if (jdkTooNew && gradleIsOld) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: JDK ${info.jdkVersion} is not supported by Gradle ${info.gradleVersion}",
+                suggestion = "Use JDK 17 or 21, or upgrade to Gradle 9+"
+            ))
+        }
+
+        // AGP 8.x requires Gradle 8.0+
+        val agpIsV8       = agpMajor != null && agpMajor >= MIN_AGP_REQUIRING_GRADLE8
+        val gradleBefore8 = gradleMajor != null && gradleMajor < MIN_AGP_REQUIRING_GRADLE8
+        if (agpIsV8 && gradleBefore8) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: AGP ${info.agpVersion} requires Gradle 8.0+, found Gradle ${info.gradleVersion}",
+                suggestion = "Upgrade Gradle to 8.0 or higher"
+            ))
+        }
+
+        // AGP 7.x requires Gradle 7.0+
+        val agpIsV7       = agpMajor != null && agpMajor == MIN_AGP_REQUIRING_GRADLE7
+        val gradleBefore7 = gradleMajor != null && gradleMajor < MIN_AGP_REQUIRING_GRADLE7
+        if (agpIsV7 && gradleBefore7) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: AGP ${info.agpVersion} requires Gradle 7.0+, found Gradle ${info.gradleVersion}",
+                suggestion = "Upgrade Gradle to 7.0 or higher"
+            ))
+        }
+
+        // AGP 8.2+ requires JDK 17+
+        val agpAbove82   = agpMajor != null && agpMinor != null &&
+            (agpMajor > MIN_AGP_REQUIRING_GRADLE8 ||
+                (agpMajor == MIN_AGP_REQUIRING_GRADLE8 && agpMinor >= MIN_AGP_MINOR_REQUIRING_JDK17))
+        val jdkBefore17  = jdkMajor != null && jdkMajor < MIN_JDK_FOR_AGP82
+        if (agpAbove82 && jdkBefore17) {
+            result.add(Diagnostic(
+                level = DiagnosticLevel.WARNING,
+                message = "Incompatible versions: AGP ${info.agpVersion} requires JDK 17+, found JDK ${info.jdkVersion}",
+                suggestion = "Set JAVA_HOME to a JDK 17 or 21 installation"
+            ))
+        }
+
+        return result
+    }
+
+    private fun parseLeadingInt(version: String): Int? =
+        version.split(".").firstOrNull()?.toIntOrNull()
+
+    private fun parseMinorInt(version: String): Int? =
+        version.split(".").getOrNull(1)?.toIntOrNull()
 }
