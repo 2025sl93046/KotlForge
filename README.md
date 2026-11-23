@@ -1,13 +1,15 @@
 # KotlForge
 
-KotlForge is a Kotlin-powered command-line tool that builds existing Android projects. Point it at any Android project that has a Gradle Wrapper and it will invoke the build, locate the APK, and report the result.
+KotlForge is a Kotlin-powered command-line tool that builds, deploys, and watches Android projects. Point it at any Android project that has a Gradle Wrapper and it will invoke the build, locate the APK, deploy it to a connected device, and watch for changes to rebuild automatically.
 
 ## Features
 
 - Detects your JDK and Android SDK configuration (`doctor`)
-- Invokes an Android project's Gradle Wrapper to produce an APK (`build`)
-- Reports build output as structured JSON
-- Works with any Android project that uses a Gradle Wrapper
+- Builds any Android project using its own Gradle Wrapper (`build`)
+- Deploys APKs to connected devices over USB or WiFi (`deploy`)
+- Watches source files and rebuilds automatically on change (`watch`)
+- Reports build output as structured JSON (`--format json`)
+- Works with any Android project — never modifies the target project
 
 ## Requirements
 
@@ -16,6 +18,7 @@ KotlForge is a Kotlin-powered command-line tool that builds existing Android pro
 | JDK | 17 or higher |
 | Gradle Wrapper | present in the target Android project |
 | Android SDK | required for building Android projects |
+| ADB | required for `deploy` and `watch --auto-deploy` |
 
 ## Getting started
 
@@ -26,31 +29,26 @@ git clone https://github.com/2025sl93046/KotlForge.git
 cd KotlForge
 ```
 
-**2. Run setup (first time only)**
+**2. Build and install the CLI**
 
 ```bash
-./setup.sh
+./gradlew :cli:installDist
 ```
 
-This pins the correct JDK, validates the Gradle Wrapper, and persists the configuration to your shell.
-
-**3. Build the project**
+**3. Run the CLI**
 
 ```bash
-./build.sh
-```
-
-**4. Run the CLI**
-
-```bash
-# Unpack the distribution
-unzip -o cli/build/distributions/cli.zip -d /tmp/kotlforge-dist
-
 # Check your toolchain
-/tmp/kotlforge-dist/cli/bin/cli doctor
+./cli/build/install/cli/bin/cli doctor
 
 # Build an Android project
-/tmp/kotlforge-dist/cli/bin/cli build --project /path/to/android-app
+./cli/build/install/cli/bin/cli build --project /path/to/android-app
+
+# Deploy APK to a connected device
+./cli/build/install/cli/bin/cli deploy --project /path/to/android-app
+
+# Watch for changes and rebuild automatically
+./cli/build/install/cli/bin/cli watch --project /path/to/android-app
 ```
 
 ## CLI commands
@@ -63,9 +61,8 @@ Checks that your machine has the required tools configured.
 $ cli doctor
 
 KotlForge Doctor
-  JDK:         /path/to/jdk
-  Android SDK: /path/to/android-sdk
-  Status: OK
+  JDK:         /path/to/jdk  [OK]
+  Android SDK: /path/to/sdk  [OK]
 ```
 
 ### `build`
@@ -76,14 +73,82 @@ Builds an Android project using its own Gradle Wrapper.
 $ cli build --project /path/to/android-app --variant debug
 
 Building debug variant at: /path/to/android-app
-Build successful
-APK: /path/to/android-app/app/build/outputs/apk/debug/app-debug.apk
+Build successful (12345ms)
+APK: /path/to/android-app/app/build/outputs/apk/debug/app-debug.apk (15360KB)
 ```
 
 | Flag | Default | Description |
 |---|---|---|
-| `--project`, `-p` | `.` (current directory) | Path to the Android project |
+| `--project`, `-p` | `.` | Path to the Android project |
 | `--variant`, `-v` | `debug` | Build variant (`debug` or `release`) |
+| `--format` | `text` | Output format (`text` or `json`) |
+
+### `deploy`
+
+Builds and deploys an APK to a connected Android device over USB or WiFi.
+
+```
+$ cli deploy --project /path/to/android-app
+```
+
+**WiFi pairing (Android 11+):**
+
+```bash
+# Step 1 — pair with the device (one time only)
+cli deploy --pair 192.168.1.5:37853 --code 123456
+
+# Step 2 — connect to the device
+cli deploy --connect 192.168.1.5:5555
+
+# Step 3 — deploy
+cli deploy --project /path/to/android-app
+```
+
+| Flag | Description |
+|---|---|
+| `--project`, `-p` | Path to the Android project |
+| `--variant`, `-v` | Build variant (default: `debug`) |
+| `--device`, `-d` | Target device serial (auto-selected if only one connected) |
+| `--pair` | WiFi pairing address (`ip:port`) |
+| `--code` | Pairing code for WiFi pairing |
+| `--connect` | WiFi connection address (`ip:port`) |
+
+### `watch`
+
+Watches source files and rebuilds (and optionally redeploys) automatically on every change.
+
+```
+$ cli watch --project /path/to/android-app --auto-deploy
+
+[watch] Watching 1 path(s). Press Ctrl+C to stop.
+[watch] Cycle 1 — 1 file(s) changed: Color.kt
+[watch] Building debug...
+[watch] Build succeeded in 12345ms
+[watch]   APK: .../app-debug.apk
+[watch] Deploying ...
+[watch] Deployed to 192.168.1.5:5555
+```
+
+| Flag | Description |
+|---|---|
+| `--project`, `-p` | Path to the Android project |
+| `--variant`, `-v` | Build variant (default: `debug`) |
+| `--deploy`, `-d` | Deploy to this device serial after each successful build |
+| `--auto-deploy` | Deploy to auto-selected device after each successful build |
+
+## Configuration
+
+Optionally add a `kotlforge.json` file to your Android project root to customise behaviour:
+
+```json
+{
+  "defaultVariant": "debug",
+  "defaultTasks": [],
+  "jdkPath": null,
+  "watchPaths": ["src"],
+  "watchIgnorePatterns": ["**/*.class", "**/build/**", "**/.gradle/**", "**/.git/**", "**/kotlforge-build.log"]
+}
+```
 
 ## Architecture
 
@@ -92,49 +157,22 @@ APK: /path/to/android-app/app/build/outputs/apk/debug/app-debug.apk
 |                        User / Terminal                           |
 +------------------------------------------------------------------+
                                |
-                               | runs
                                v
 +------------------------------------------------------------------+
 |                         cli module                               |
-|                                                                  |
-|   kotlforge doctor          kotlforge build                      |
-|   +------------------+      +-----------------------------+      |
-|   | DoctorCommand    |      | BuildCommand                |      |
-|   | prints JDK path  |      | --project  --variant        |      |
-|   | prints SDK path  |      +-------------+---------------+      |
-|   +--------+---------+                    |                      |
-|            |                              |                      |
-+------------|------------------------------|--------------------+-+
-             |                              |
-             | uses                         | uses
-             v                              v
-+------------------------+    +------------------------------+
-|   diagnostics module   |    |      build-engine module     |
-|                        |    |                              |
-|  ToolchainDetector     |    |  GradleRunner                |
-|  - reads JAVA_HOME     |    |  - receives BuildRequest     |
-|  - reads ANDROID_HOME  |    |  - finds ./gradlew           |
-|  - validates both      |    |  - runs assembleDebug/...    |
-|                        |    |  - locates APK output        |
-|                        |    |  - returns BuildResult       |
-+------------------------+    +---------------+--------------+
-             |                                |
-             | both depend on                 |
-             v                                v
-+------------------------------------------------------------------+
-|                         core module                              |
-|                                                                  |
-|   BuildRequest                    BuildResult                    |
-|   - projectPath: String           - success: Boolean            |
-|   - variant: String               - apkPath: String?            |
-|                                   - errorMessage: String?       |
-+------------------------------------------------------------------+
+|   DoctorCommand   BuildCommand   DeployCommand   WatchCommand    |
++----+----------+--------+---------------+---------------+---------+
+     |          |        |               |               |
+     v          v        v               v               v
++----------+ +--------+ +-----------+ +--------+ +------------+
+|diagnostics| |  core  | |build-engine| | deploy | |   watch    |
+|ToolchainDe| |models  | |GradleRunner| |AdbLocator|WatchEngine|
+|tector     | |        | |            | |Deployer| |FileWatcher |
++-----------+ +--------+ +------------+ +--------+ +------------+
                                |
-                               | invokes
                                v
 +------------------------------------------------------------------+
 |               Target Android Project (external)                  |
-|                                                                  |
 |   ./gradlew assembleDebug                                        |
 |   app/build/outputs/apk/debug/app-debug.apk                     |
 +------------------------------------------------------------------+
@@ -144,36 +182,39 @@ APK: /path/to/android-app/app/build/outputs/apk/debug/app-debug.apk
 
 ```
 KotlForge/
-├── core/               BuildRequest and BuildResult data models
+├── core/               Shared models: BuildRequest, BuildResult, KotlForgeConfig
 ├── diagnostics/        JDK, Android SDK, and Gradle toolchain detection
 ├── build-engine/       Gradle Wrapper process runner and APK locator
-├── cli/                CLI entry point and commands
-├── samples/
-│   └── android-app/    Sample Android project used for integration testing
+├── deploy/             ADB device detection, WiFi pairing, APK installation
+├── watch/              File system watcher, debounce, incremental rebuild loop
+├── cli/                Clikt-based CLI: doctor, build, deploy, watch
+├── detekt.yml          Static analysis configuration
 ├── .github/
-│   ├── workflows/      CI, integration, and release pipelines
+│   ├── workflows/      CI, integration (matrix AGP), and release pipelines
 │   └── ISSUE_TEMPLATE/ Bug report and feature request templates
 ├── setup.sh            One-time environment setup
 └── build.sh            Project build script
-```
-
-## Development
-
-```bash
-./gradlew clean check   # compile all modules, run tests, run static analysis
-./gradlew build         # build all modules and produce distributions
-./gradlew :cli:run --args="doctor"                            # run CLI directly
-./gradlew :cli:run --args="build --project /path/to/app"     # run build command
 ```
 
 ## Module overview
 
 | Module | Responsibility |
 |---|---|
-| `core` | Shared data models: `BuildRequest`, `BuildResult` |
-| `diagnostics` | Detects JDK and Android SDK, validates Gradle/AGP compatibility |
-| `build-engine` | Runs the target project's Gradle Wrapper, locates the APK output |
-| `cli` | Clikt-based CLI: `doctor` and `build` subcommands |
+| `core` | Shared data models: `BuildRequest`, `BuildResult`, `KotlForgeConfig` |
+| `diagnostics` | Detects JDK and Android SDK, validates toolchain |
+| `build-engine` | Runs the target project's Gradle Wrapper, locates APK/AAB output |
+| `deploy` | ADB device detection, WiFi pairing/connect, APK installation |
+| `watch` | File system monitoring, debounce, incremental rebuild loop |
+| `cli` | Clikt-based CLI: `doctor`, `build`, `deploy`, `watch` subcommands |
+
+## Development
+
+```bash
+./gradlew clean check        # compile, run tests, run detekt
+./gradlew build              # build all modules
+./gradlew detekt             # static analysis only
+./gradlew :cli:installDist   # build and install CLI locally
+```
 
 ## Tech stack
 
@@ -190,10 +231,10 @@ KotlForge/
 
 ## CI/CD
 
-| Pipeline | Trigger | Purpose |
+| Pipeline | Trigger | Jobs |
 |---|---|---|
-| `ci.yml` | Every PR and push to `main` | Compile, test, static analysis |
-| `integration.yml` | PRs touching build-related modules | Build a real Android APK end to end |
+| `ci.yml` | Every PR and push to `main` | Unit Tests, Static Analysis, Build (parallel) |
+| `integration.yml` | PRs touching build-related modules | Matrix APK build across AGP 8.1, 8.3, 8.6 |
 | `release.yml` | Tags matching `v*` | Produce versioned distributions |
 
 ## Contributing
