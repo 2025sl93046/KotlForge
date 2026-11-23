@@ -11,13 +11,21 @@ class ToolchainDetector(
 ) {
 
     companion object {
-        /** Standard SDK locations tried when no env var is set, in priority order. */
+        /** Static SDK locations (no env var expansion needed), in priority order. */
         internal val STANDARD_SDK_PATHS: List<String> = listOf(
-            "${System.getProperty("user.home")}/Library/Android/sdk",          // macOS (Android Studio)
-            "${System.getProperty("user.home")}/Android/Sdk",                  // Linux (Android Studio)
-            "/opt/homebrew/share/android-commandlinetools",                     // macOS Homebrew
-            "/usr/lib/android-sdk",                                             // Linux package manager
-            "${System.getenv("LOCALAPPDATA")}\\Android\\Sdk"                   // Windows
+            "${System.getProperty("user.home")}/Library/Android/sdk",   // macOS (Android Studio)
+            "${System.getProperty("user.home")}/Android/Sdk",           // Linux (Android Studio)
+            "/opt/homebrew/share/android-commandlinetools",              // macOS Homebrew
+            "/usr/lib/android-sdk",                                      // Linux package manager
+        )
+
+        /**
+         * Windows SDK paths that require env var expansion. Evaluated lazily via
+         * [resolveAndroidSdkPath] so they go through the injected [env] provider.
+         */
+        internal val WINDOWS_SDK_PATH_TEMPLATES: List<String> = listOf(
+            "%LOCALAPPDATA%\\Android\\Sdk",   // Android Studio default
+            "%USERPROFILE%\\Android\\Sdk",    // fallback user profile
         )
     }
 
@@ -51,8 +59,20 @@ class ToolchainDetector(
         val fromEnv = env("ANDROID_HOME") ?: env("ANDROID_SDK_ROOT")
         if (fromEnv != null) return fromEnv
 
-        // 2. Fall back to standard platform paths
-        return STANDARD_SDK_PATHS.firstOrNull { isDirectory(it) }
+        // 2. Static standard paths (macOS / Linux)
+        STANDARD_SDK_PATHS.firstOrNull { isDirectory(it) }?.let { return it }
+
+        // 3. Windows paths — expand %VAR% tokens via injected env
+        return WINDOWS_SDK_PATH_TEMPLATES
+            .mapNotNull { template -> expandWindowsTemplate(template) }
+            .firstOrNull { isDirectory(it) }
+    }
+
+    /** Expands a single %VAR_NAME% token in a Windows path template. */
+    internal fun expandWindowsTemplate(template: String): String? {
+        val match = Regex("""%([^%]+)%""").find(template) ?: return template
+        val value = env(match.groupValues[1]) ?: return null
+        return template.replace(match.value, value)
     }
 
     fun checks(info: ToolchainInfo): List<Diagnostic> {
