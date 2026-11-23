@@ -84,24 +84,12 @@ class ToolchainDetectorTest {
 
     @Test
     fun `resolveAndroidSdkPath falls back to first existing standard path when no env var`() {
-        val tempDir = Files.createTempDirectory("fake-sdk").toFile()
-        try {
-            val d = ToolchainDetector(
-                env = { _ -> null },
-                isDirectory = { path -> path == tempDir.absolutePath }
-            )
-            // Override STANDARD_SDK_PATHS indirectly by checking isDirectory is consulted
-            val resolved = d.resolveAndroidSdkPath()
-            // If none of the STANDARD_SDK_PATHS match tempDir.absolutePath, result is null — that's fine.
-            // The real assertion: when isDirectory returns true for a path, that path is returned.
-            val dWithFakePath = ToolchainDetector(
-                env = { _ -> null },
-                isDirectory = { _ -> true }
-            )
-            assertNotNull(dWithFakePath.resolveAndroidSdkPath())
-        } finally {
-            tempDir.deleteRecursively()
-        }
+        // When isDirectory always returns true, the first STANDARD_SDK_PATH is returned.
+        val d = ToolchainDetector(
+            env = { _ -> null },
+            isDirectory = { _ -> true }
+        )
+        assertNotNull(d.resolveAndroidSdkPath())
     }
 
     @Test
