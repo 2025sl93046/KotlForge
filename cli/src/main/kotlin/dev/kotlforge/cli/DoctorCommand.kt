@@ -2,17 +2,22 @@ package dev.kotlforge.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.ProgramResult
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.option
 import dev.kotlforge.core.DiagnosticLevel
 import dev.kotlforge.diagnostics.ToolchainDetector
+import java.io.File
 
 class DoctorCommand : CliktCommand(
     name = "doctor",
     help = "Check toolchain requirements (JDK, Android SDK)"
 ) {
+    private val project by option("--project", "-p", help = "Path to Android project root")
+        .default(".")
+
     override fun run() {
         val detector = ToolchainDetector()
-        val info = detector.detect()
-        val diagnostics = detector.checks(info)
+        val diagnostics = detector.runChecks(File(project))
 
         echo("KotlForge Doctor")
         echo("")
