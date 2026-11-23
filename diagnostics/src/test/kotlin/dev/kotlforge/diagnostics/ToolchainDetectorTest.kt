@@ -454,4 +454,97 @@ class ToolchainDetectorTest {
             tempDir.deleteRecursively()
         }
     }
+
+    // ── BLI 2.9: negative-path fixture tests ─────────────────────────────────
+
+    @Test
+    fun `runChecks reports ERROR for JDK when JAVA_HOME is not set`() {
+        val d = ToolchainDetector(
+            env = { _ -> null },
+            isDirectory = { _ -> false }
+        )
+        val diagnostics = d.runChecks()
+        val diag = diagnostics.first { it.message.contains("JDK") }
+        assertEquals(DiagnosticLevel.ERROR, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `runChecks reports ERROR for JDK when JAVA_HOME points to nonexistent path`() {
+        val d = ToolchainDetector(
+            env = { name -> if (name == "JAVA_HOME") "/nonexistent/jdk" else null },
+            isDirectory = { _ -> false }
+        )
+        val diagnostics = d.runChecks()
+        val diag = diagnostics.first { it.message.contains("JDK") }
+        assertEquals(DiagnosticLevel.ERROR, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `runChecks reports ERROR for Android SDK when ANDROID_HOME is not set`() {
+        val d = ToolchainDetector(
+            env = { _ -> null },
+            isDirectory = { _ -> false }
+        )
+        val diagnostics = d.runChecks()
+        val diag = diagnostics.first { it.message.contains("Android SDK") }
+        assertEquals(DiagnosticLevel.ERROR, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `runChecks reports ERROR for Android SDK when ANDROID_HOME points to nonexistent path`() {
+        val d = ToolchainDetector(
+            env = { name -> if (name == "ANDROID_HOME") "/nonexistent/sdk" else null },
+            isDirectory = { _ -> false }
+        )
+        val diagnostics = d.runChecks()
+        val diag = diagnostics.first { it.message.contains("Android SDK") }
+        assertEquals(DiagnosticLevel.ERROR, diag.level)
+        assertNotNull(diag.suggestion)
+    }
+
+    @Test
+    fun `runChecks reports WARNING for Gradle wrapper when wrapper properties file is missing`() {
+        val tempDir = Files.createTempDirectory("fake-project-no-wrapper").toFile()
+        try {
+            val d = ToolchainDetector(env = { _ -> null }, isDirectory = { _ -> false })
+            val diagnostics = d.runChecks(tempDir)
+            val diag = diagnostics.first { it.message.contains("Gradle wrapper") }
+            assertEquals(DiagnosticLevel.WARNING, diag.level)
+            assertNotNull(diag.suggestion)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `runChecks reports WARNING for AGP when no build files exist`() {
+        val tempDir = Files.createTempDirectory("fake-project-no-agp").toFile()
+        try {
+            val d = ToolchainDetector(env = { _ -> null }, isDirectory = { _ -> false })
+            val diagnostics = d.runChecks(tempDir)
+            val diag = diagnostics.first { it.message.contains("AGP") }
+            assertEquals(DiagnosticLevel.WARNING, diag.level)
+            assertNotNull(diag.suggestion)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `runChecks all ERROR and WARNING when env is empty and no project files exist`() {
+        val tempDir = Files.createTempDirectory("fake-project-empty").toFile()
+        try {
+            val d = ToolchainDetector(env = { _ -> null }, isDirectory = { _ -> false })
+            val diagnostics = d.runChecks(tempDir)
+            assertTrue(diagnostics.any { it.level == DiagnosticLevel.ERROR && it.message.contains("JDK") })
+            assertTrue(diagnostics.any { it.level == DiagnosticLevel.ERROR && it.message.contains("Android SDK") })
+            assertTrue(diagnostics.any { it.level == DiagnosticLevel.WARNING && it.message.contains("Gradle wrapper") })
+            assertTrue(diagnostics.any { it.level == DiagnosticLevel.WARNING && it.message.contains("AGP") })
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }
