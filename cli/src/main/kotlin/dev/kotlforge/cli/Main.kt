@@ -10,7 +10,8 @@ import kotlin.system.exitProcess
 
 // Exit codes: 0=success, 1=build failed, 2=bad args, 3=env failed
 fun main(args: Array<String>) {
-    val app = KotlForge().subcommands(DoctorCommand(), BuildCommand(), InspectCommand(), CleanCommand(), DeployCommand(), WatchCommand())
+    val app = KotlForge().subcommands(DoctorCommand(), BuildCommand(), InspectCommand(), CleanCommand(), InitCommand(), DeployCommand(), WatchCommand())
+
     try {
         app.parse(args)
     } catch (e: ProgramResult) {
