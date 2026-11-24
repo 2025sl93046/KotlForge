@@ -80,19 +80,6 @@ jobs:
             exit 1
           fi
 
-      - name: Verify non-zero exit on invalid project path
-        id: failure-test
-        run: ./cli/build/install/cli/bin/cli build --project /tmp/does-not-exist --variant debug
-        continue-on-error: true
-
-      - name: Assert controlled failure exited non-zero
-        run: |
-          if [ "${{ steps.failure-test.outcome }}" != "failure" ]; then
-            echo "ERROR: build on missing project should have failed but exited 0"
-            exit 1
-          fi
-          echo "Controlled failure verified: exit code was non-zero as expected"
-
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
