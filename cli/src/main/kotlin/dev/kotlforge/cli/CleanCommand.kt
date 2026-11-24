@@ -4,8 +4,6 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
-import dev.kotlforge.core.BuildRequest
-import dev.kotlforge.engine.GradleRunner
 import java.io.File
 import java.nio.file.Path
 
@@ -19,21 +17,30 @@ class CleanCommand : CliktCommand(
         val absRoot = Path.of(projectPath).toAbsolutePath().normalize()
         val projectDir = absRoot.toFile()
 
+        val wrapperName = if (isWindows()) "gradlew.bat" else "gradlew"
+        val wrapper = File(projectDir, wrapperName)
+
+        if (!wrapper.exists()) {
+            echo("Error: Gradle wrapper not found in ${projectDir.absolutePath}", err = true)
+            throw ProgramResult(ExitCode.BAD_ARGS)
+        }
+
         echo("Cleaning project at: $absRoot")
 
-        val result = GradleRunner().build(
-            BuildRequest(projectDir = absRoot.toString(), tasks = listOf("clean"))
-        )
+        val process = ProcessBuilder(wrapper.absolutePath, "clean")
+            .directory(projectDir)
+            .redirectErrorStream(true)
+            .start()
 
-        if (!result.success) {
-            val error = result.diagnostics.firstOrNull()
-            echo("Clean failed: ${error?.message ?: "unknown error"}", err = true)
-            if (error?.suggestion != null) echo("  Suggestion: ${error.suggestion}", err = true)
+        process.inputStream.bufferedReader().forEachLine { echo(it) }
+
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            echo("Clean failed", err = true)
             throw ProgramResult(ExitCode.BUILD_FAILED)
         }
 
         deleteKotlforgeFiles(projectDir)
-
         echo("Clean successful")
     }
 
@@ -46,4 +53,6 @@ class CleanCommand : CliktCommand(
             }
         }
     }
+
+    private fun isWindows() = System.getProperty("os.name").lowercase().contains("win")
 }
