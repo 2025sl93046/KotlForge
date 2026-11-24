@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import dev.kotlforge.core.Diagnostic
 import dev.kotlforge.core.DiagnosticLevel
 import dev.kotlforge.diagnostics.ToolchainDetector
+import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -15,15 +16,14 @@ class DoctorCommand : CliktCommand(
     name = "doctor",
     help = "Check toolchain requirements (JDK, Android SDK)"
 ) {
-    private val format by option("--format", "-f", help = "Output format: text or json")
+    private val project by option("--project", "-p", help = "Path to Android project root").default(".")
+    private val format  by option("--format",  "-f", help = "Output format: text or json")
         .choice("text", "json").default("text")
 
     private val json = Json { prettyPrint = true }
 
     override fun run() {
-        val detector = ToolchainDetector()
-        val info = detector.detect()
-        val diagnostics = detector.checks(info)
+        val diagnostics = ToolchainDetector().runChecks(File(project))
 
         val errorCount = diagnostics.count { it.level == DiagnosticLevel.ERROR }
         val warnCount  = diagnostics.count { it.level == DiagnosticLevel.WARNING }
