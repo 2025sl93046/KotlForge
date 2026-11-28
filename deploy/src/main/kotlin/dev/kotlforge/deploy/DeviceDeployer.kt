@@ -14,7 +14,7 @@ class DeviceDeployer(
     private val processRunner: ProcessRunner = DefaultProcessRunner()
 ) {
 
-    fun deploy(apkPath: String, deviceSerial: String? = null): DeployResult {
+    fun deploy(apkPath: String, deviceSerial: String? = null, installMode: InstallMode = InstallMode.STANDARD): DeployResult {
         val adb = AdbLocator.locate()
             ?: return DeployResult(
                 success = false,
@@ -44,7 +44,7 @@ class DeviceDeployer(
         }
 
         val installer = ApkInstaller(adb, processRunner)
-        return installer.install(apkPath, target.serial).fold(
+        return installer.install(apkPath, target.serial, installMode).fold(
             onSuccess = { DeployResult(success = true, deviceSerial = target.serial, message = "Installed on ${target.serial}") },
             onFailure = { DeployResult(success = false, deviceSerial = target.serial, message = it.message ?: "Unknown error") }
         )

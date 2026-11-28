@@ -3,6 +3,7 @@ package dev.kotlforge.watch
 import dev.kotlforge.core.BuildEngine
 import dev.kotlforge.core.BuildRequest
 import dev.kotlforge.deploy.DeviceDeployer
+import dev.kotlforge.deploy.InstallMode
 import dev.kotlforge.engine.GradleRunner
 import java.io.File
 import java.nio.file.Path
@@ -12,7 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class WatchEngine(
     private val buildEngine: BuildEngine = GradleRunner(),
-    private val deployer: DeviceDeployer? = null
+    private val deployer: DeviceDeployer? = null,
+    private val deployMode: DeployMode = DeployMode.STANDARD
 ) {
 
     fun watch(
@@ -26,6 +28,17 @@ class WatchEngine(
     ) {
         val latch = CountDownLatch(1)
         val cycleCount = AtomicInteger(0)
+
+        val injector = if (deployMode == DeployMode.LIGHTNING) {
+            BuildGradleInjector(projectDir).also { inj ->
+                if (!inj.inject()) {
+                    println("[lightning] Could not inject SwapAgent — falling back to standard deploy")
+                    return watch(projectDir, variant, watchPaths, ignorePatterns, deviceSerial, debounceMillis, onCycle)
+                }
+                println("[lightning] Lightning mode active — app state will be preserved across changes")
+                println("[lightning] NOTE: structural changes (new fields/classes) will trigger a full reinstall automatically")
+            }
+        } else null
 
         val debouncer = DebounceTimer<Path>(debounceMillis) { changedFiles ->
             val result = runCycle(
@@ -47,6 +60,7 @@ class WatchEngine(
             println("\n[watch] Shutting down...")
             watcher.stop()
             debouncer.shutdown()
+            injector?.restore()
             stopGradleDaemon(projectDir)
             latch.countDown()
         }, "kotlforge-shutdown")
@@ -62,6 +76,7 @@ class WatchEngine(
         } finally {
             watcher.stop()
             debouncer.shutdown()
+            injector?.restore()
             try {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook)
             } catch (_: IllegalStateException) {}
@@ -103,14 +118,78 @@ class WatchEngine(
             return WatchCycleResult(cycleNum, changedFiles, buildResult, null, duration)
         }
 
-        println("[watch] Deploying ${apk.path}...")
-        val deployResult = deployer.deploy(apk.path, deviceSerial)
+        return when (deployMode) {
+            DeployMode.LIGHTNING -> runLightningDeploy(apk.path, projectDir, variant, cycleNum, changedFiles, buildResult, deviceSerial, duration)
+            DeployMode.INCREMENTAL -> runInstallDeploy(apk.path, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.INCREMENTAL)
+            DeployMode.STANDARD -> runInstallDeploy(apk.path, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.STANDARD)
+        }
+    }
+
+    private fun runInstallDeploy(
+        apkPath: String,
+        deviceSerial: String?,
+        cycleNum: Int,
+        changedFiles: List<Path>,
+        buildResult: dev.kotlforge.core.BuildResult,
+        duration: Long,
+        installMode: InstallMode
+    ): WatchCycleResult {
+        val modeLabel = if (installMode == InstallMode.INCREMENTAL) "[incremental] " else ""
+        println("[watch] ${modeLabel}Deploying $apkPath...")
+        val deployResult = deployer!!.deploy(apkPath, deviceSerial, installMode)
         return if (deployResult.success) {
             println("[watch] Deployed to ${deployResult.deviceSerial}")
             WatchCycleResult(cycleNum, changedFiles, buildResult, deployResult.deviceSerial, duration)
         } else {
             println("[watch] Deploy failed: ${deployResult.message}")
             WatchCycleResult(cycleNum, changedFiles, buildResult, null, duration)
+        }
+    }
+
+    private fun runLightningDeploy(
+        apkPath: String,
+        projectDir: File,
+        variant: String,
+        cycleNum: Int,
+        changedFiles: List<Path>,
+        buildResult: dev.kotlforge.core.BuildResult,
+        deviceSerial: String?,
+        duration: Long
+    ): WatchCycleResult {
+        val swapClient = SwapAgentClient()
+
+        if (!swapClient.isAgentReachable()) {
+            // Agent not running yet — full install to get agent onto device
+            println("[lightning] SwapAgent not running on device — doing full install to start it")
+            return runInstallDeploy(apkPath, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.STANDARD)
+        }
+
+        val dexDir = File(projectDir, "app/build/intermediates/dex/$variant")
+        val dexFiles = dexDir.walkTopDown().filter { it.extension == "dex" }.toList()
+
+        println("[lightning] Pushing ${dexFiles.size} dex file(s) to SwapAgent...")
+        return when (val swapResult = swapClient.pushDex(dexFiles)) {
+            is SwapResult.Success -> {
+                println("[lightning] Hot-swap complete — app state preserved")
+                WatchCycleResult(cycleNum, changedFiles, buildResult, "lightning-swap", duration)
+            }
+            is SwapResult.StructuralChange -> {
+                // New field/class added — JVMTI cannot handle this, fall back to full reinstall
+                println("[lightning] Structural change detected (new field or class) — falling back to full reinstall")
+                runInstallDeploy(apkPath, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.STANDARD)
+            }
+            is SwapResult.AgentNotReachable -> {
+                println("[lightning] SwapAgent not reachable — falling back to full reinstall")
+                runInstallDeploy(apkPath, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.STANDARD)
+            }
+            is SwapResult.NoDexFiles -> {
+                println("[lightning] No dex files found — falling back to full reinstall")
+                runInstallDeploy(apkPath, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.STANDARD)
+            }
+            is SwapResult.AgentError -> {
+                println("[lightning] SwapAgent error: ${swapResult.reason} — falling back to full reinstall")
+                runInstallDeploy(apkPath, deviceSerial, cycleNum, changedFiles, buildResult, duration, InstallMode.STANDARD)
+            }
         }
     }
 
