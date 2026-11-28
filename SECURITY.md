@@ -6,8 +6,8 @@ KotlForge is currently in active development. Only the latest release on `main` 
 
 | Version | Supported |
 |---|---|
-| `main` (latest) | ✅ |
-| Older releases | ❌ |
+| `main` (latest) | Yes |
+| Older releases | No |
 
 ---
 
